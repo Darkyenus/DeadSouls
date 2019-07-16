@@ -38,6 +38,7 @@ import java.util.Random;
 import java.util.logging.Level;
 
 import static com.darkyen.minecraft.Util.distance2;
+import static com.darkyen.minecraft.Util.getTotalExperience;
 import static com.darkyen.minecraft.Util.isNear;
 import static com.darkyen.minecraft.Util.parseTimeMs;
 import static com.darkyen.minecraft.Util.set;
@@ -353,7 +354,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         int soulXp;
         if (!event.getKeepLevel()) {
-            final int totalExperience = player.getTotalExperience();
+            final int totalExperience = getTotalExperience(player);
             if (retainedXPPercent >= 0) {
                 soulXp = Math.round(totalExperience * retainedXPPercent);
             } else {

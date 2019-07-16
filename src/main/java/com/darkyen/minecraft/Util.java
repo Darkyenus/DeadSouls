@@ -1,6 +1,7 @@
 package com.darkyen.minecraft;
 
 import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -128,5 +129,35 @@ public class Util {
         } else {
             return value;
         }
+    }
+
+    static int getExpToLevel(int expLevel) {
+        // From Spigot source
+        if (expLevel >= 30) return 112 + (expLevel - 30) * 9;
+        else if (expLevel >= 15) return 37 + (expLevel - 15) * 5;
+        else return 7 + expLevel * 2;
+    }
+
+    static int getExperienceToReach(int level) {
+        // From https://minecraft.gamepedia.com/Experience (16. 7. 2019, Minecraft 1.14.2)
+        final int level2 = level * level;
+        if (level <= 16) {
+            return level2 + 6*level;
+        } else if (level <= 31) {
+            return level2 * 2 + level2/2 - 40*level - level/2 + 360;
+        } else {
+            return level2 * 4 + level2/2 - 162 * level - level/2 + 2220;
+        }
+    }
+
+    public static int getTotalExperience(Player player) {
+        // This is total experience collected. However, it can be lower than what player thinks,
+        // because "/xp add level"-style commands don't increase this value, so we need to compute it manually.
+        final int totalExperience = player.getTotalExperience();
+
+        final int computedExperience = getExperienceToReach(player.getLevel())
+                + Math.round(getExpToLevel(player.getLevel()) * player.getExp());
+
+        return Math.max(totalExperience, computedExperience);
     }
 }
