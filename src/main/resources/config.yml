@@ -1,11 +1,19 @@
+# <number> = positive number made up from digits 0 to 9
 # <time> = <number> <unit>
-#        | never
-# <unit> = s (seconds)
-#        | m (minutes)
-#        | h (hours)
-#        | d (days)
+#        | "never"
+# <unit> = "s" (seconds)
+#        | "m" (minutes)
+#        | "h" (hours)
+#        | "d" (days)
+# <percent> = <number> "%"
+# <xp-per-level> = <number>
 
 # <time> after which the soul can be collected by anyone
 soul-free-after: 1h
 # <time> after which the soul disappears
 soul-fades-after: never
+
+# <percent> of experience points retained by souls
+# OR <xp-per-level> to retain by soul. Vanilla behavior is 7 xp-per-level.
+# Soul will never retain more xp than the player has collected.
+retained-xp: 90%

@@ -34,6 +34,7 @@ import static com.darkyen.minecraft.Serialization.deserializeObject;
 import static com.darkyen.minecraft.Serialization.deserializeUUID;
 import static com.darkyen.minecraft.Serialization.serializeObject;
 import static com.darkyen.minecraft.Serialization.serializeUUID;
+import static com.darkyen.minecraft.Util.saturatedAdd;
 
 /**
  *
@@ -68,7 +69,7 @@ public class SoulDatabase {
 
     public void save() throws IOException {
         final ArrayList<@Nullable Soul> soulsCopy;
-        synchronized (souls) {
+        synchronized (soulsById) {
             soulsCopy = new ArrayList<>(soulsById);
         }
 
@@ -98,10 +99,33 @@ public class SoulDatabase {
         }
     }
 
+    public int removeFadedSouls(long soulFadesAfterMs) {
+        final ArrayList<@Nullable Soul> soulsById = this.soulsById;
+        int fadedSouls = 0;
+        final long now = System.currentTimeMillis();
+        //noinspection SynchronizationOnLocalVariableOrMethodParameter
+        synchronized (soulsById) {
+            for (int i = 0; i < soulsById.size(); i++) {
+                final Soul soul = soulsById.get(i);
+                if (soul == null)
+                    continue;
+
+                if (Util.saturatedAdd(soul.timestamp, soulFadesAfterMs) <= now) {
+                    // Soul should expire
+                    soulsById.set(i, null);
+                    souls.remove(soul);
+                    fadedSouls++;
+                }
+            }
+        }
+
+        return fadedSouls;
+    }
+
     public int addSoul(UUID owner, Location location, ItemStack[] contents, int xp) {
         final Soul soul = new Soul(owner, location, System.currentTimeMillis(), contents, xp);
         int soulId = -1;
-        synchronized (souls) {
+        synchronized (soulsById) {
             final ArrayList<@Nullable Soul> soulsById = this.soulsById;
             for (int i = 0; i < soulsById.size(); i++) {
                 if (soulsById.get(i) == null) {
@@ -127,12 +151,12 @@ public class SoulDatabase {
         return soulId;
     }
 
-    public void freeSoul(CommandSender sender, int soulId) {
+    public void freeSoul(CommandSender sender, int soulId, long soulFreeAfterMs) {
         Soul soul;
         if (soulId < 0) {
             soul = null;
         } else {
-            synchronized (souls) {
+            synchronized (soulsById) {
                 if (soulId >= soulsById.size()) {
                     soul = null;
                 } else {
@@ -156,16 +180,21 @@ public class SoulDatabase {
             return;
         }
 
-        soul.owner = null;
-        sender.sendMessage(ChatColor.AQUA+"Soul has been set free");
+        if (soul.freeSoul(System.currentTimeMillis(), soulFreeAfterMs)) {
+            sender.sendMessage(ChatColor.AQUA+"Soul has been set free");
+        } else {
+            sender.sendMessage(ChatColor.AQUA+"This soul is already free");
+        }
     }
 
     public void removeSoul(Soul toRemove) {
-        final int i = soulsById.indexOf(toRemove);
-        if (i == -1) {
-            LOG.log(Level.WARNING, "Soul "+toRemove+" already removed from BY-ID");
-        } else {
-            soulsById.set(i, null);
+        synchronized (soulsById) {
+            final int i = soulsById.indexOf(toRemove);
+            if (i == -1) {
+                LOG.log(Level.WARNING, "Soul " + toRemove + " already removed from BY-ID");
+            } else {
+                soulsById.set(i, null);
+            }
         }
 
         if (!souls.remove(toRemove)) {
@@ -197,6 +226,32 @@ public class SoulDatabase {
             this.timestamp = timestamp;
             this.items = items;
             this.xp = xp;
+        }
+
+        public boolean isAccessibleBy(OfflinePlayer player, long now, long soulFreeAfterMs) {
+            final UUID owner = this.owner;
+            if (owner != null && !owner.equals(player.getUniqueId())) {
+                // Soul of somebody else, not accessible unless expired
+                if (saturatedAdd(timestamp, soulFreeAfterMs) <= now) {
+                    // Soul should become free
+                    this.owner = null;
+                    return true;
+                }
+                return false;
+            }
+            return true;
+        }
+
+        /** @return true if free, false if already freed */
+        public boolean freeSoul(long now, long soulFreeAfterMs) {
+            if (this.owner == null) {
+                return false;
+            }
+
+            this.owner = null;
+            // Did soul become free on its own?
+            return saturatedAdd(timestamp, soulFreeAfterMs) > now;
+
         }
 
         @Override

@@ -28,7 +28,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -41,7 +40,6 @@ import java.util.logging.Level;
 import static com.darkyen.minecraft.Util.distance2;
 import static com.darkyen.minecraft.Util.isNear;
 import static com.darkyen.minecraft.Util.parseTimeMs;
-import static com.darkyen.minecraft.Util.saturatedAdd;
 import static com.darkyen.minecraft.Util.set;
 
 /**
@@ -52,6 +50,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private SoulDatabase soulDatabase;
     private long soulFreeAfterMs = Long.MAX_VALUE;
     private long soulFadesAfterMs = Long.MAX_VALUE;
+
+    private float retainedXPPercent;
+    private int retainedXPPerLevel;
 
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
     private boolean soulDatabaseChanged = false;
@@ -67,10 +68,22 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private final Location processPlayers_playerLocation = new Location(null, 0, 0, 0);
     private final Random processPlayers_random = new Random();
 
+    private long processPlayers_nextFadeCheck = 0;
+
     private void processPlayers() {
+        final long now = System.currentTimeMillis();
+
+        if (now > processPlayers_nextFadeCheck && soulFadesAfterMs < Long.MAX_VALUE) {
+            final int faded = soulDatabase.removeFadedSouls(soulFadesAfterMs);
+            if (faded > 0) {
+                this.soulDatabaseChanged = true;
+                getLogger().log(Level.INFO, "Removed "+faded+" faded soul(s)");
+            }
+            processPlayers_nextFadeCheck = now + 1000 * 60;// Check every minute
+        }
+
         final boolean soulDatabaseChanged = this.soulDatabaseChanged;
         this.soulDatabaseChanged = false;
-        final long now = System.currentTimeMillis();
 
         final boolean playSounds = this.processPlayers_random.nextInt(8) == 0;
 
@@ -125,14 +138,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
             int remainingSoulsToShow = 16;
             for (int i = 0; i < soulCount && remainingSoulsToShow > 0; i++) {
                 final SoulDatabase.Soul soul = visibleSouls.get(i);
-                if (soul.owner != null && !soul.owner.equals(player.getUniqueId())) {
-                    // Soul of somebody else, do not show, if it is not time to expire it
-                    if (saturatedAdd(soul.timestamp, soulFreeAfterMs) <= now) {
-                        // Soul should become free
-                        soul.owner = null;
-                    } else {
-                        continue;
-                    }
+                if (!soul.isAccessibleBy(player, now, soulFreeAfterMs)) {
+                    // Soul of somebody else, do not show nor collect
+                    continue;
                 }
 
                 // Show this soul!
@@ -154,7 +162,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 //noinspection ForLoopReplaceableByForEach
                 for (int soulI = 0; soulI < visibleSouls.size(); soulI++) {
                     final SoulDatabase.Soul closestSoul = visibleSouls.get(soulI);
-                    if (closestSoul.owner != null && !closestSoul.owner.equals(player.getUniqueId())) {
+                    if (!closestSoul.isAccessibleBy(player, now, soulFreeAfterMs)) {
                         // Soul of somebody else, do not show nor collect
                         continue;
                     }
@@ -217,6 +225,42 @@ public class DeadSouls extends JavaPlugin implements Listener {
         soulFreeAfterMs = parseTimeMs(getConfig().getString("soul-free-after"), Long.MAX_VALUE, getLogger());
         soulFadesAfterMs = parseTimeMs(getConfig().getString("soul-fades-after"), Long.MAX_VALUE, getLogger());
 
+        {
+            this.retainedXPPercent = 90;
+            this.retainedXPPerLevel = 0;
+            final String retainedXp = getConfig().getString("retained-xp");
+            if (retainedXp != null) {
+                String sanitizedRetainedXp = retainedXp.replaceAll("\\s", "");
+                boolean percent = false;
+                if (sanitizedRetainedXp.endsWith("%")) {
+                    percent = true;
+                    sanitizedRetainedXp = sanitizedRetainedXp.substring(0, sanitizedRetainedXp.length() - 1);
+                }
+                try {
+                    final int number = Integer.parseInt(sanitizedRetainedXp);
+                    if (percent) {
+                        if (number < 0 || number > 100) {
+                            getLogger().log(Level.WARNING, "Invalid configuration: retained-xp percent must be between 0 and 1");
+                        } else {
+                            retainedXPPercent = number / 100f;
+                            retainedXPPerLevel = 0;
+                        }
+                    } else {
+                        if (number < 0) {
+                            getLogger().log(Level.WARNING, "Invalid configuration: retained-xp per level must be positive");
+                        } else {
+                            retainedXPPercent = -1f;
+                            retainedXPPerLevel = number;
+                        }
+                    }
+                } catch (NumberFormatException nfe) {
+                    getLogger().log(Level.WARNING, "Invalid configuration: retained-xp has invalid format");
+                }
+            }
+        }
+
+        saveDefaultConfig();
+
         getServer().getPluginManager().registerEvents(this, this);
 
         // Run included tests
@@ -254,10 +298,14 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        final SoulDatabase itemStore = this.soulDatabase;
-        if (itemStore != null) {
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase != null) {
             try {
-                itemStore.save();
+                final int faded = soulDatabase.removeFadedSouls(soulFadesAfterMs);
+                if (faded > 0) {
+                    getLogger().log(Level.INFO, "Removed "+faded+" faded soul(s)");
+                }
+                soulDatabase.save();
             } catch (Exception e) {
                 getLogger().log(Level.SEVERE, "Failed to save soul database", e);
             }
@@ -277,7 +325,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 return false;
             }
 
-            soulDatabase.freeSoul(sender, soulId);
+            soulDatabase.freeSoul(sender, soulId, soulFreeAfterMs);
             return true;
         }
         return false;
@@ -305,8 +353,13 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         int soulXp;
         if (!event.getKeepLevel()) {
-            soulXp = player.getTotalExperience();
-            soulXp -= soulXp / 10;// 10% is lost
+            final int totalExperience = player.getTotalExperience();
+            if (retainedXPPercent >= 0) {
+                soulXp = Math.round(totalExperience * retainedXPPercent);
+            } else {
+                soulXp = retainedXPPerLevel * player.getLevel();
+            }
+            soulXp = Util.clamp(soulXp, 0, totalExperience);
             event.setNewExp(0);
             event.setNewLevel(0);
             event.setNewTotalExp(0);
@@ -330,11 +383,15 @@ public class DeadSouls extends JavaPlugin implements Listener {
         final int soulId = soulDatabase.addSoul(player.getUniqueId(), soulLocation, soulItems, soulXp);
         soulDatabaseChanged = true;
 
-        final TextComponent freeMySoul = new TextComponent("Free my soul");
+        final TextComponent star = new TextComponent("✦");
+        star.setColor(ChatColor.YELLOW);
+        final TextComponent freeMySoul = new TextComponent(" Free my soul ");
         freeMySoul.setColor(ChatColor.GOLD);
+        freeMySoul.setBold(true);
+        freeMySoul.setUnderlined(true);
         freeMySoul.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new BaseComponent[]{new TextComponent("Allows other players to collect the soul immediately")}));
         freeMySoul.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dead_souls_free_soul "+soulId));
-        player.spigot().sendMessage(ChatMessageType.CHAT, freeMySoul);
+        player.spigot().sendMessage(ChatMessageType.CHAT, star, freeMySoul, star);
 
         player.getWorld().playSound(soulLocation, Sound.BLOCK_BELL_RESONATE, SoundCategory.MASTER, 1.1f, 1.7f);
     }
