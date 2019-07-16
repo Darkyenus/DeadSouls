@@ -1,0 +1,11 @@
+# <time> = <number> <unit>
+#        | never
+# <unit> = s (seconds)
+#        | m (minutes)
+#        | h (hours)
+#        | d (days)
+
+# <time> after which the soul can be collected by anyone
+soul-free-after: 1h
+# <time> after which the soul disappears
+soul-fades-after: never

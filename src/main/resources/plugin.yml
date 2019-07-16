@@ -1,0 +1,14 @@
+name: DeadSouls
+version: 1.1
+api-version: 1.14
+main: com.darkyen.minecraft.DeadSouls
+authors: [Darkyen]
+commands:
+  dead_souls_free_soul:
+    description: (Internal command) Allow anyone to reclaim items held by the soul.
+    usage: /dead_souls_free_soul <soul id>
+    permission: com.darkyen.minecraft.deadsouls.hassoul
+permissions:
+  com.darkyen.minecraft.deadsouls.hassoul:
+    description: Has soul that holds onto their items.
+    default: true
