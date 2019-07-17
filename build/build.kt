@@ -1,11 +1,12 @@
 @file:Suppress("unused")
-import wemi.*
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiRootFolder
+import wemi.configuration
+import wemi.dependency
 import wemi.dependency.Jitpack
 import wemi.dependency.sonatypeOss
-import wemi.util.*
-import java.nio.file.StandardCopyOption
+import wemi.util.FileSet
+import wemi.util.plus
 
 val liveTesting by configuration("Add live testing capability") {
 	sources modify { it + FileSet(WemiRootFolder / "src/live-test/java") }
@@ -17,7 +18,7 @@ val DeadSouls by project(Archetypes.JavaProject) {
 
 	projectGroup set { "com.darkyen.minecraft" }
 	projectName set { "DeadSouls" }
-	projectVersion set { "1.0" }
+	projectVersion set { "1.0-mc1.13.2" }
 
 	repositories add { Repository("spigot-repo", "https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
 	repositories add { Jitpack }
@@ -25,7 +26,7 @@ val DeadSouls by project(Archetypes.JavaProject) {
 
 	extend(compiling) {
 		libraryDependencies add { dependency("org.jetbrains", "annotations", "16.0.2") }
-		libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.14.2-R0.1-SNAPSHOT") }
+		libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.13.2-R0.1-SNAPSHOT") }
 	}
 	
 	extend(testing) {
@@ -35,14 +36,4 @@ val DeadSouls by project(Archetypes.JavaProject) {
 	}
 
 	assemblyOutputFile set { WemiBuildFolder / "DeadSouls-${projectVersion.get()}.jar" }
-	
-	assembly modify { assembled ->
-		val testServerPlugins = WemiRootFolder / "../TEST SERVER/plugins"
-		if (testServerPlugins.exists()) {
-			assembled.copyRecursively(testServerPlugins / (projectName.get() + ".jar"), StandardCopyOption.REPLACE_EXISTING)
-			println("Copied to test server")
-		}
-
-		assembled
-	}
 }

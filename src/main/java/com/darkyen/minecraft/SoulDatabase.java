@@ -205,7 +205,7 @@ public class SoulDatabase {
     public void findSouls(World world, int x, int z, int radius, Collection<Soul> out) {
         souls.query((x - radius) / SOUL_STORE_SCALE, (x + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE,
                 (z - radius) / SOUL_STORE_SCALE, (z + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE, out);
-        out.removeIf((soul) -> !soul.location.isWorldLoaded() || soul.location.getWorld() != world);
+        out.removeIf((soul) -> soul.location.getWorld() == null || soul.location.getWorld() != world);
     }
 
     static final class Soul implements SpatialDatabase.Entry {

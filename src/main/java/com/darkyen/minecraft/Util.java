@@ -23,21 +23,21 @@ public class Util {
 
 
     public static double distance2(@NotNull Location a, @NotNull Location b) {
-        if (!a.isWorldLoaded() || !b.isWorldLoaded() || a.getWorld() != b.getWorld()) {
+        if (a.getWorld() == null || b.getWorld() == null || a.getWorld() != b.getWorld()) {
             return Double.POSITIVE_INFINITY;
         }
         return NumberConversions.square(a.getX() - b.getX()) + NumberConversions.square(a.getY() - b.getY()) + NumberConversions.square(a.getZ() - b.getZ());
     }
 
     public static double distance2(@NotNull Location a, @NotNull Location b, double yScale) {
-        if (!a.isWorldLoaded() || !b.isWorldLoaded() || a.getWorld() != b.getWorld()) {
+        if (a.getWorld() == null || b.getWorld() == null || a.getWorld() != b.getWorld()) {
             return Double.POSITIVE_INFINITY;
         }
         return NumberConversions.square(a.getX() - b.getX()) + NumberConversions.square((a.getY() - b.getY()) * yScale) + NumberConversions.square(a.getZ() - b.getZ());
     }
 
     public static boolean isNear(@NotNull Location a, @NotNull Location b, float distance) {
-        if (!a.isWorldLoaded() || !b.isWorldLoaded()) {
+        if (a.getWorld() == null || b.getWorld() == null) {
             return false;
         }
         if (a.getWorld() != b.getWorld()) {

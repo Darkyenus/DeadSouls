@@ -6,6 +6,7 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -223,6 +224,12 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
+        if (!Bukkit.getBukkitVersion().startsWith("1.13")) {
+            getLogger().log(Level.WARNING, "This is a special version for 1.13 servers and this does not seem to be a 1.13 server.");
+            getLogger().log(Level.WARNING, "If you are running a lower version, nothing is guaranteed to work.");
+            getLogger().log(Level.WARNING, "If you are running a higher version, please update to the mainline release.");
+        }
+
         soulFreeAfterMs = parseTimeMs(getConfig().getString("soul-free-after"), Long.MAX_VALUE, getLogger());
         soulFadesAfterMs = parseTimeMs(getConfig().getString("soul-fades-after"), Long.MAX_VALUE, getLogger());
 
@@ -394,7 +401,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         freeMySoul.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dead_souls_free_soul "+soulId));
         player.spigot().sendMessage(ChatMessageType.CHAT, star, freeMySoul, star);
 
-        player.getWorld().playSound(soulLocation, Sound.BLOCK_BELL_RESONATE, SoundCategory.MASTER, 1.1f, 1.7f);
+        player.getWorld().playSound(soulLocation, Sound.BLOCK_BEACON_POWER_SELECT, SoundCategory.MASTER, 1.1f, 1.7f);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
