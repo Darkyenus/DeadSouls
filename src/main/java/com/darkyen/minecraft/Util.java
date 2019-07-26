@@ -151,13 +151,8 @@ public class Util {
     }
 
     public static int getTotalExperience(Player player) {
-        // This is total experience collected. However, it can be lower than what player thinks,
-        // because "/xp add level"-style commands don't increase this value, so we need to compute it manually.
-        final int totalExperience = player.getTotalExperience();
-
-        final int computedExperience = getExperienceToReach(player.getLevel())
-                + Math.round(getExpToLevel(player.getLevel()) * player.getExp());
-
-        return Math.max(totalExperience, computedExperience);
+        // Can't use player.getTotalExperience(), because that does not properly handle XP added via "/xp add level",
+        // and, most importantly, it does not factor in experience spent on enchanting.
+        return getExperienceToReach(player.getLevel()) + Math.round(getExpToLevel(player.getLevel()) * player.getExp());
     }
 }
