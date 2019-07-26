@@ -81,6 +81,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     private boolean soulFreeingEnabled = true;
 
+    private boolean smartSoulPlacement = true;
+
     private PvPBehavior pvpBehavior = PvPBehavior.NORMAL;
 
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
@@ -338,6 +340,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
             }
         }
 
+        smartSoulPlacement = config.getBoolean("smart-soul-placement", true);
+
         saveDefaultConfig();
 
         getServer().getPluginManager().registerEvents(this, this);
@@ -478,7 +482,17 @@ public class DeadSouls extends JavaPlugin implements Listener {
             info = new PlayerSoulInfo();
             watchedPlayers.put(player, info);
         }
-        final Location soulLocation = info.findSafeSoulSpawnLocation(player);
+        final Location soulLocation;
+        if (smartSoulPlacement) {
+            soulLocation = info.findSafeSoulSpawnLocation(player);
+            info.lastSafeLocation.setWorld(null); // Reset it, so it isn't used twice
+        } else {
+            soulLocation = player.getLocation();
+            if (soulLocation.getY() < 0) {
+                soulLocation.setY(0);
+            }
+            soulLocation.setY(soulLocation.getY() + 1.2);
+        }
         UUID owner = player.getUniqueId();
         if (pvp && pvpBehavior == PvPBehavior.FREE) {
             owner = null;

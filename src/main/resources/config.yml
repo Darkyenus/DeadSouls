@@ -24,6 +24,12 @@ pvp-behavior: normal
 # Soul will never retain more xp than the player has collected.
 retained-xp: 90%
 
+# Souls will not be placed directly where the player has died, but at the last
+# player's location which is considered safe (unless it is too far away).
+# For example, when player falls to their death, their soul will be placed at the ledge from which they fell.
+# Similarly for falling into lava.
+smart-soul-placement: true
+
 # Sound played when collecting XP from a soul
 sound-soul-collect-xp: entity.experience_orb.pickup
 # Sound played when collecting items from a soul
