@@ -69,6 +69,13 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private static final String DEFAULT_SOUND_SOUL_DROPPED = "block.bell.resonate";
     private String soundSoulDropped = DEFAULT_SOUND_SOUL_DROPPED;
 
+    private static final String DEFAULT_TEXT_FREE_MY_SOUL = "Free my soul";
+    private String textFreeMySoul = DEFAULT_TEXT_FREE_MY_SOUL;
+    private static final String DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP = "Allows other players to collect the soul immediately";
+    private String textFreeMySoulTooltip = DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP;
+
+    private boolean soulFreeingEnabled = true;
+
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
     private boolean soulDatabaseChanged = false;
 
@@ -286,6 +293,10 @@ public class DeadSouls extends JavaPlugin implements Listener {
         soundSoulDropped = normalizeKey(config.getString("sound-soul-dropped", DEFAULT_SOUND_SOUL_DROPPED));
         volumeSoulCalling = (float)config.getDouble("volume-soul-calling", DEFAULT_VOLUME_SOUL_CALLING);
 
+        textFreeMySoul = config.getString("text-free-my-soul", DEFAULT_TEXT_FREE_MY_SOUL);
+        textFreeMySoulTooltip = config.getString("text-free-my-soul-tooltip", DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP);
+        soulFreeingEnabled = textFreeMySoul != null && !textFreeMySoul.isEmpty();
+
         saveDefaultConfig();
 
         getServer().getPluginManager().registerEvents(this, this);
@@ -345,6 +356,10 @@ public class DeadSouls extends JavaPlugin implements Listener {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if ("dead_souls_free_soul".equals(command.getName()) && args.length == 1) {
+            if (!soulFreeingEnabled) {
+                return true;
+            }
+
             final int soulId;
             try {
                 soulId = Integer.parseInt(args[0]);
@@ -410,15 +425,21 @@ public class DeadSouls extends JavaPlugin implements Listener {
         final int soulId = soulDatabase.addSoul(player.getUniqueId(), soulLocation, soulItems, soulXp);
         soulDatabaseChanged = true;
 
-        final TextComponent star = new TextComponent("✦");
-        star.setColor(ChatColor.YELLOW);
-        final TextComponent freeMySoul = new TextComponent(" Free my soul ");
-        freeMySoul.setColor(ChatColor.GOLD);
-        freeMySoul.setBold(true);
-        freeMySoul.setUnderlined(true);
-        freeMySoul.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new BaseComponent[]{new TextComponent("Allows other players to collect the soul immediately")}));
-        freeMySoul.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dead_souls_free_soul "+soulId));
-        player.spigot().sendMessage(ChatMessageType.CHAT, star, freeMySoul, star);
+        // Do not offer to free the soul if it will be free sooner than the player can click the button
+        if (soulFreeAfterMs > 1000 && soulFreeingEnabled && textFreeMySoul != null && !textFreeMySoul.isEmpty()) {
+            final TextComponent star = new TextComponent("✦");
+            star.setColor(ChatColor.YELLOW);
+            final TextComponent freeMySoul = new TextComponent(" "+textFreeMySoul+" ");
+            freeMySoul.setColor(ChatColor.GOLD);
+            freeMySoul.setBold(true);
+            freeMySoul.setUnderlined(true);
+            if (textFreeMySoulTooltip != null && !textFreeMySoulTooltip.isEmpty()) {
+                freeMySoul.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        new BaseComponent[]{new TextComponent(textFreeMySoulTooltip)}));
+            }
+            freeMySoul.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dead_souls_free_soul " + soulId));
+            player.spigot().sendMessage(ChatMessageType.CHAT, star, freeMySoul, star);
+        }
 
         if (!soundSoulDropped.isEmpty()) {
             player.getWorld().playSound(soulLocation, soundSoulDropped, SoundCategory.MASTER, 1.1f, 1.7f);

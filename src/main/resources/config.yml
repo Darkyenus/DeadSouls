@@ -31,3 +31,8 @@ volume-soul-calling: 16
 # Sound played to dying players that drop a soul
 # NOTE FOR 1.13 USERS: This sound exists only since 1.14, suggested replacement is: block.beacon.power_select
 sound-soul-dropped: block.bell.resonate
+
+# Text on a button to free the soul (Set to empty to disable this functionality)
+text-free-my-soul: "Free my soul"
+# Text displayed as a tooltip on button to free player's soul (Set to empty to disable the tooltip)
+text-free-my-soul-tooltip: "Allows other players to collect the soul immediately"
