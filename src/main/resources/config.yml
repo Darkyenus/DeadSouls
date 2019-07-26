@@ -17,3 +17,17 @@ soul-fades-after: never
 # OR <xp-per-level> to retain by soul. Vanilla behavior is 7 xp-per-level.
 # Soul will never retain more xp than the player has collected.
 retained-xp: 90%
+
+# Sound played when collecting XP from a soul
+sound-soul-collect-xp: entity.experience_orb.pickup
+# Sound played when collecting items from a soul
+sound-soul-collect-item: item.trident.return
+# Sound played when everything in the soul has been collected and the soul disappears
+sound-soul-depleted: entity.generic.extinguish_fire
+# Sound played by nearby souls to eligible players, to help them better find the soul
+sound-soul-calling: block.beacon.ambient
+# Volume with which the soul is calling. Values above 1 only affect distance.
+volume-soul-calling: 16
+# Sound played to dying players that drop a soul
+# NOTE FOR 1.13 USERS: This sound exists only since 1.14, suggested replacement is: block.beacon.power_select
+sound-soul-dropped: block.bell.resonate

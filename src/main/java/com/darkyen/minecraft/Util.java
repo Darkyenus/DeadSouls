@@ -6,7 +6,6 @@ import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.xml.stream.events.Characters;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -103,6 +102,14 @@ public class Util {
         }
 
         return unit.toMillis(amount);
+    }
+
+    @NotNull
+    public static String normalizeKey(@Nullable String sound) {
+        if (sound == null) {
+            return "";
+        }
+        return sound.replaceAll("[^_./:0-9A-Za-z-]+", "").toLowerCase();
     }
 
     // https://stackoverflow.com/a/2633161

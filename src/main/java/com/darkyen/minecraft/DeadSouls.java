@@ -11,12 +11,12 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
-import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -40,6 +40,7 @@ import java.util.logging.Level;
 import static com.darkyen.minecraft.Util.distance2;
 import static com.darkyen.minecraft.Util.getTotalExperience;
 import static com.darkyen.minecraft.Util.isNear;
+import static com.darkyen.minecraft.Util.normalizeKey;
 import static com.darkyen.minecraft.Util.parseTimeMs;
 import static com.darkyen.minecraft.Util.set;
 
@@ -54,6 +55,19 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     private float retainedXPPercent;
     private int retainedXPPerLevel;
+
+    private static final String DEFAULT_SOUND_SOUL_COLLECT_XP = "entity.experience_orb.pickup";
+    private String soundSoulCollectXp = DEFAULT_SOUND_SOUL_COLLECT_XP;
+    private static final String DEFAULT_SOUND_SOUL_COLLECT_ITEM = "item.trident.return";
+    private String soundSoulCollectItem = DEFAULT_SOUND_SOUL_COLLECT_ITEM;
+    private static final String DEFAULT_SOUND_SOUL_DEPLETED = "entity.generic.extinguish_fire";
+    private String soundSoulDepleted = DEFAULT_SOUND_SOUL_DEPLETED;
+    private static final String DEFAULT_SOUND_SOUL_CALLING = "block.beacon.ambient";
+    private String soundSoulCalling = DEFAULT_SOUND_SOUL_CALLING;
+    private static final float DEFAULT_VOLUME_SOUL_CALLING = 16f;
+    private float volumeSoulCalling = DEFAULT_VOLUME_SOUL_CALLING;
+    private static final String DEFAULT_SOUND_SOUL_DROPPED = "block.bell.resonate";
+    private String soundSoulDropped = DEFAULT_SOUND_SOUL_DROPPED;
 
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
     private boolean soulDatabaseChanged = false;
@@ -86,7 +100,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         final boolean soulDatabaseChanged = this.soulDatabaseChanged;
         this.soulDatabaseChanged = false;
 
-        final boolean playSounds = this.processPlayers_random.nextInt(8) == 0;
+        final boolean playCallingSounds = !soundSoulCalling.isEmpty() && volumeSoulCalling > 0f && this.processPlayers_random.nextInt(12) == 0;
 
         for (Map.Entry<Player, PlayerSoulInfo> entry : watchedPlayers.entrySet()) {
             final Player player = entry.getKey();
@@ -174,7 +188,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
                         if (closestSoul.xp > 0) {
                             player.giveExp(closestSoul.xp);
                             closestSoul.xp = 0;
-                            player.playSound(closestSoul.location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1f);
+                            if (!soundSoulCollectXp.isEmpty()) {
+                                player.playSound(closestSoul.location, soundSoulCollectXp, 1f, 1f);
+                            }
                         }
 
                         final @NotNull ItemStack[] items = closestSoul.items;
@@ -198,8 +214,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
                                 }
                             }
 
-                            if (someCollected) {
-                                player.playSound(closestSoul.location, Sound.ITEM_TRIDENT_RETURN, 1f, 0.5f);
+                            if (someCollected && !soundSoulCollectItem.isEmpty()) {
+                                player.playSound(closestSoul.location, soundSoulCollectItem, 1f, 0.5f);
                             }
                         }
 
@@ -209,11 +225,13 @@ public class DeadSouls extends JavaPlugin implements Listener {
                             this.soulDatabaseChanged = true;
 
                             // Do some fancy effect
-                            player.playSound(closestSoul.location, Sound.ENTITY_GENERIC_EXTINGUISH_FIRE, 0.1f, 0.5f);
+                            if (!soundSoulDepleted.isEmpty()) {
+                                player.playSound(closestSoul.location, soundSoulDepleted, 0.1f, 0.5f);
+                            }
                             player.spawnParticle(Particle.REDSTONE, closestSoul.location, 20, 0.2, 0.2, 0.2, SOUL_DUST_OPTIONS_GONE);
                         }
-                    } else if (playSounds) {
-                        player.playSound(closestSoul.location, Sound.BLOCK_BEACON_AMBIENT, 16f, 0.75f);
+                    } else if (playCallingSounds) {
+                        player.playSound(closestSoul.location, soundSoulCalling, volumeSoulCalling, 0.75f);
                     }
                     break;
                 }
@@ -223,13 +241,14 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-        soulFreeAfterMs = parseTimeMs(getConfig().getString("soul-free-after"), Long.MAX_VALUE, getLogger());
-        soulFadesAfterMs = parseTimeMs(getConfig().getString("soul-fades-after"), Long.MAX_VALUE, getLogger());
+        final FileConfiguration config = getConfig();
+        soulFreeAfterMs = parseTimeMs(config.getString("soul-free-after"), Long.MAX_VALUE, getLogger());
+        soulFadesAfterMs = parseTimeMs(config.getString("soul-fades-after"), Long.MAX_VALUE, getLogger());
 
         {
             this.retainedXPPercent = 90;
             this.retainedXPPerLevel = 0;
-            final String retainedXp = getConfig().getString("retained-xp");
+            final String retainedXp = config.getString("retained-xp");
             if (retainedXp != null) {
                 String sanitizedRetainedXp = retainedXp.replaceAll("\\s", "");
                 boolean percent = false;
@@ -259,6 +278,13 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 }
             }
         }
+
+        soundSoulCollectXp = normalizeKey(config.getString("sound-soul-collect-xp", DEFAULT_SOUND_SOUL_COLLECT_XP));
+        soundSoulCollectItem = normalizeKey(config.getString("sound-soul-collect-item", DEFAULT_SOUND_SOUL_COLLECT_ITEM));
+        soundSoulDepleted = normalizeKey(config.getString("sound-soul-depleted", DEFAULT_SOUND_SOUL_DEPLETED));
+        soundSoulCalling = normalizeKey(config.getString("sound-soul-calling", DEFAULT_SOUND_SOUL_CALLING));
+        soundSoulDropped = normalizeKey(config.getString("sound-soul-dropped", DEFAULT_SOUND_SOUL_DROPPED));
+        volumeSoulCalling = (float)config.getDouble("volume-soul-calling", DEFAULT_VOLUME_SOUL_CALLING);
 
         saveDefaultConfig();
 
@@ -394,7 +420,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
         freeMySoul.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dead_souls_free_soul "+soulId));
         player.spigot().sendMessage(ChatMessageType.CHAT, star, freeMySoul, star);
 
-        player.getWorld().playSound(soulLocation, Sound.BLOCK_BELL_RESONATE, SoundCategory.MASTER, 1.1f, 1.7f);
+        if (!soundSoulDropped.isEmpty()) {
+            player.getWorld().playSound(soulLocation, soundSoulDropped, SoundCategory.MASTER, 1.1f, 1.7f);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
