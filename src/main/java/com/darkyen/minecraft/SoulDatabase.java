@@ -9,6 +9,7 @@ import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,9 +41,12 @@ import static com.darkyen.minecraft.Util.saturatedAdd;
 /**
  *
  */
+@SuppressWarnings("WeakerAccess") // For tests
 public class SoulDatabase {
 
     private static final Logger LOG = Logger.getLogger("DeadSouls-ItemStore");
+
+    private static final int CURRENT_DB_VERSION = 1;
 
     @NotNull
     private final Plugin owner;
@@ -55,23 +59,54 @@ public class SoulDatabase {
     public SoulDatabase(@NotNull Plugin owner, @NotNull Path databaseFile) throws IOException, Serialization.Exception {
         this.owner = owner;
         this.databaseFile = databaseFile;
-        Files.createDirectories(databaseFile.getParent());
 
+        load(databaseFile);
+    }
+
+    public void load(Path databaseFile) throws IOException, Serialization.Exception {
         try (DataInputChannel in = new DataInputChannel(Files.newByteChannel(databaseFile, StandardOpenOption.READ))) {
+            final int version = in.readInt();
+            if (version > CURRENT_DB_VERSION || version < 0) {
+                throw new Serialization.Exception("Invalid database version, please upgrade the plugin");
+            }
             while (in.hasRemaining()) {
-                final Soul soul = deserializeSoul(in);
+                final Soul soul = deserializeSoul(in, version);
                 soulsById.add(soul);
                 souls.insert(soul);
             }
         } catch (NoSuchFileException ignored) {}
     }
 
+    public void loadLegacy(Path databaseFile) throws IOException, Serialization.Exception {
+        try (DataInputChannel in = new DataInputChannel(Files.newByteChannel(databaseFile, StandardOpenOption.READ))) {
+            while (in.hasRemaining()) {
+                final Soul soul = deserializeSoul(in, 0);
+                soulsById.add(soul);
+                souls.insert(soul);
+            }
+        } catch (NoSuchFileException ignored) {
+            return;
+        }
+
+        // Loaded successfully, save and delete legacy
+        if (save()) {
+            Files.deleteIfExists(databaseFile);
+            LOG.log(Level.INFO, "Soul database migrated");
+        }
+    }
+
     private final Object SAVE_LOCK = new Object();
 
-    public void save() throws IOException {
+    public boolean save() throws IOException {
         final ArrayList<@Nullable Soul> soulsCopy;
         synchronized (soulsById) {
             soulsCopy = new ArrayList<>(soulsById);
+        }
+
+        try {
+            Files.createDirectories(databaseFile.getParent());
+        } catch (IOException io) {
+            LOG.log(Level.WARNING, "Failed to create directories for soul database file, saving may fail", io);
         }
 
         synchronized (SAVE_LOCK) {
@@ -79,11 +114,16 @@ public class SoulDatabase {
             for (int i = 0; i < 10; i++) {
                 final Path writeFile = databaseFile
                         .resolveSibling(databaseFile.getFileName().toString() + "." + (System.nanoTime() & 0xFFFFFF));
+                int failedWrites = 0;
                 try (DataOutputChannel out = new DataOutputChannel(Files
                         .newByteChannel(writeFile, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE))) {
+                    out.writeInt(CURRENT_DB_VERSION);
+
                     for (final Soul soul : soulsCopy) {
                         if (soul != null) {
-                            serializeSoul(soul, out);
+                            if (!serializeSoul(soul, out)) {
+                                failedWrites++;
+                            }
                         }
                     }
                 } catch (FileAlreadyExistsException alreadyExists) {
@@ -94,10 +134,14 @@ public class SoulDatabase {
 
                 // File written, now we can replace the old one
                 Files.move(writeFile, databaseFile, StandardCopyOption.REPLACE_EXISTING);
-                return;
+
+                LOG.log(Level.WARNING, failedWrites+" soul(s) failed to save");
+                return true;
             }
             LOG.log(Level.SEVERE, "Failed to save souls", exception);
         }
+
+        return false;
     }
 
     public int removeFadedSouls(long soulFadesAfterMs) {
@@ -123,8 +167,8 @@ public class SoulDatabase {
         return fadedSouls;
     }
 
-    public int addSoul(UUID owner, Location location, ItemStack[] contents, int xp) {
-        final Soul soul = new Soul(owner, location, System.currentTimeMillis(), contents, xp);
+    public int addSoul(@NotNull UUID owner, @NotNull UUID world, double x, double y, double z, ItemStack[] contents, int xp) {
+        final Soul soul = new Soul(owner, world, x, y, z, System.currentTimeMillis(), contents, xp);
         int soulId = -1;
         synchronized (soulsById) {
             final ArrayList<@Nullable Soul> soulsById = this.soulsById;
@@ -206,14 +250,17 @@ public class SoulDatabase {
     public void findSouls(@NotNull World world, int x, int z, int radius, Collection<Soul> out) {
         souls.query((x - radius) / SOUL_STORE_SCALE, (x + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE,
                 (z - radius) / SOUL_STORE_SCALE, (z + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE, out);
-        out.removeIf((soul) -> !world.equals(getWorld(soul.location)));
+        final UUID worldUID = world.getUID();
+        out.removeIf((soul) -> !worldUID.equals(soul.locationWorld));
     }
 
+    @SuppressWarnings("WeakerAccess")
     static final class Soul implements SpatialDatabase.Entry {
 
         @Nullable
         UUID owner;
-        final Location location;
+        final UUID locationWorld;
+        final double locationX, locationY, locationZ;
         final long timestamp;
         /** Can be changed when collected */
         @NotNull
@@ -221,14 +268,18 @@ public class SoulDatabase {
         /** Can be changed when collected */
         int xp;
 
-        Soul(@Nullable UUID owner, Location location, long timestamp, @NotNull ItemStack[] items, int xp) {
+        Soul(@Nullable UUID owner, @NotNull UUID locationWorld, double x, double y, double z, long timestamp, @NotNull ItemStack[] items, int xp) {
             this.owner = owner;
-            this.location = location;
+            this.locationWorld = locationWorld;
+            this.locationX = x;
+            this.locationY = y;
+            this.locationZ = z;
             this.timestamp = timestamp;
             this.items = items;
             this.xp = xp;
         }
 
+        @SuppressWarnings("BooleanMethodIsAlwaysInverted")
         public boolean isAccessibleBy(OfflinePlayer player, long now, long soulFreeAfterMs) {
             final UUID owner = this.owner;
             if (owner != null && !owner.equals(player.getUniqueId())) {
@@ -257,26 +308,45 @@ public class SoulDatabase {
 
         @Override
         public int x() {
-            return location.getBlockX() / SOUL_STORE_SCALE;
+            return NumberConversions.floor(locationX) / SOUL_STORE_SCALE;
         }
 
         @Override
         public int y() {
-            return location.getBlockZ() / SOUL_STORE_SCALE;
+            return NumberConversions.floor(locationZ) / SOUL_STORE_SCALE;
+        }
+
+        private transient Location locationCache = null;
+
+        @Nullable
+        public Location getLocation(@Nullable World worldHint) {
+            Location locationCache = this.locationCache;
+            if (locationCache != null && getWorld(locationCache) != null) {
+                return locationCache;
+            }
+            World world;
+            if (worldHint != null && locationWorld.equals(worldHint.getUID())) {
+                world = worldHint;
+            } else {
+                world = Bukkit.getWorld(locationWorld);
+            }
+            if (world == null) {
+                locationCache = null;
+            } else {
+                locationCache = new Location(world, locationX, locationY, locationZ);
+            }
+
+            this.locationCache = locationCache;
+            return locationCache;
         }
     }
 
     static boolean serializeSoul(Soul soul, DataOutputChannel out) {
-        final World world = getWorld(soul.location);
-        if (world == null) {
-            return false;
-        }
-
         try {
-            serializeUUID(world.getUID(), out);
-            out.writeInt(soul.location.getBlockX());
-            out.writeInt(soul.location.getBlockY());
-            out.writeInt(soul.location.getBlockZ());
+            serializeUUID(soul.locationWorld, out);
+            out.writeDouble(soul.locationX);
+            out.writeDouble(soul.locationY);
+            out.writeDouble(soul.locationZ);
             if (soul.owner == null) {
                 serializeUUID(ZERO_UUID, out);
             } else {
@@ -319,11 +389,11 @@ public class SoulDatabase {
     }
 
     @NotNull
-    static Soul deserializeSoul(DataInput in) throws IOException, Serialization.Exception {
+    static Soul deserializeSoul(DataInput in, int version) throws IOException, Serialization.Exception {
         final UUID worldUUID = deserializeUUID(in);
-        final int locationX = in.readInt();
-        final int locationY = in.readInt();
-        final int locationZ = in.readInt();
+        final double locationX = version == 0 ? in.readInt() : in.readDouble();
+        final double locationY = version == 0 ? in.readInt() : in.readDouble();
+        final double locationZ = version == 0 ? in.readInt() : in.readDouble();
         final UUID ownerUUID = deserializeUUID(in);
         final long timestamp = in.readLong();
         final int xp = in.readInt();
@@ -346,13 +416,7 @@ public class SoulDatabase {
             }
         }
 
-        World world = Bukkit.getWorld(worldUUID);
-        if (world == null) {
-            LOG.log(Level.WARNING, "No world with UUID "+worldUUID+" found");
-            world = Bukkit.getWorlds().get(0);
-        }
-        final Location location = new Location(world, locationX, locationY, locationZ);
         final UUID owner = ownerUUID.equals(ZERO_UUID) ? null : ownerUUID;
-        return new Soul(owner, location, timestamp, items, xp);
+        return new Soul(owner, worldUUID, locationX, locationY, locationZ, timestamp, items, xp);
     }
 }

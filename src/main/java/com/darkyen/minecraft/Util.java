@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 /**
  *
  */
+@SuppressWarnings("WeakerAccess")
 public class Util {
 
     public static boolean overlaps(int quadMin, int quadMax, int queryMin, int queryMax) {
@@ -57,6 +58,14 @@ public class Util {
             return Double.POSITIVE_INFINITY;
         }
         return NumberConversions.square(a.getX() - b.getX()) + NumberConversions.square((a.getY() - b.getY()) * yScale) + NumberConversions.square(a.getZ() - b.getZ());
+    }
+
+    public static double distance2(@NotNull SoulDatabase.Soul soul, @NotNull Location loc, double yScale) {
+        final World locWorld = getWorld(loc);
+        if (locWorld == null || !soul.locationWorld.equals(locWorld.getUID())) {
+            return Double.POSITIVE_INFINITY;
+        }
+        return NumberConversions.square(soul.locationX - loc.getX()) + NumberConversions.square((soul.locationY - loc.getY()) * yScale) + NumberConversions.square(soul.locationZ - loc.getZ());
     }
 
     public static boolean isNear(@NotNull Location a, @NotNull Location b, float distance) {

@@ -30,6 +30,8 @@ import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -154,9 +156,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
             { // Sort souls
                 final ComparatorSoulDistanceTo comparator = this.processPlayers_comparatorDistanceTo;
-                comparator.toX = playerLocation.getBlockX();
-                comparator.toY = playerLocation.getBlockY();
-                comparator.toZ = playerLocation.getBlockZ();
+                comparator.toX = playerLocation.getX();
+                comparator.toY = playerLocation.getY();
+                comparator.toZ = playerLocation.getZ();
                 visibleSouls.sort(comparator);
             }
 
@@ -170,16 +172,21 @@ public class DeadSouls extends JavaPlugin implements Listener {
                     continue;
                 }
 
+                final Location soulLocation = soul.getLocation(player.getWorld());
+                if (soulLocation == null) {
+                    continue;
+                }
+
                 // Show this soul!
                 if (soul.xp > 0 && soul.items.length > 0) {
-                    player.spawnParticle(Particle.REDSTONE, soul.location, 10, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_ITEMS);
-                    player.spawnParticle(Particle.REDSTONE, soul.location, 10, 0.12, 0.12, 0.12, SOUL_DUST_OPTIONS_XP);
+                    player.spawnParticle(Particle.REDSTONE, soulLocation, 10, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_ITEMS);
+                    player.spawnParticle(Particle.REDSTONE, soulLocation, 10, 0.12, 0.12, 0.12, SOUL_DUST_OPTIONS_XP);
                 } else if (soul.xp > 0) {
                     // Only xp
-                    player.spawnParticle(Particle.REDSTONE, soul.location, 20, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_XP);
+                    player.spawnParticle(Particle.REDSTONE, soulLocation, 20, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_XP);
                 } else {
                     // Only items
-                    player.spawnParticle(Particle.REDSTONE, soul.location, 20, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_ITEMS);
+                    player.spawnParticle(Particle.REDSTONE, soulLocation, 20, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_ITEMS);
                 }
                 remainingSoulsToShow--;
             }
@@ -194,14 +201,16 @@ public class DeadSouls extends JavaPlugin implements Listener {
                         continue;
                     }
 
-                    final double dst2 = distance2(closestSoul.location, playerLocation, 0.4);
+                    final double dst2 = distance2(closestSoul, playerLocation, 0.4);
+                    final Location closestSoulLocation = closestSoul.getLocation(player.getWorld());
+
                     if (dst2 < COLLECTION_DISTANCE2) {
                         // Collect it!
                         if (closestSoul.xp > 0) {
                             player.giveExp(closestSoul.xp);
                             closestSoul.xp = 0;
-                            if (!soundSoulCollectXp.isEmpty()) {
-                                player.playSound(closestSoul.location, soundSoulCollectXp, 1f, 1f);
+                            if (!soundSoulCollectXp.isEmpty() && closestSoulLocation != null) {
+                                player.playSound(closestSoulLocation, soundSoulCollectXp, 1f, 1f);
                             }
                         }
 
@@ -226,8 +235,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
                                 }
                             }
 
-                            if (someCollected && !soundSoulCollectItem.isEmpty()) {
-                                player.playSound(closestSoul.location, soundSoulCollectItem, 1f, 0.5f);
+                            if (someCollected && !soundSoulCollectItem.isEmpty() && closestSoulLocation != null) {
+                                player.playSound(closestSoulLocation, soundSoulCollectItem, 1f, 0.5f);
                             }
                         }
 
@@ -237,13 +246,15 @@ public class DeadSouls extends JavaPlugin implements Listener {
                             this.soulDatabaseChanged = true;
 
                             // Do some fancy effect
-                            if (!soundSoulDepleted.isEmpty()) {
-                                player.playSound(closestSoul.location, soundSoulDepleted, 0.1f, 0.5f);
+                            if (closestSoulLocation != null) {
+                                if (!soundSoulDepleted.isEmpty()) {
+                                    player.playSound(closestSoulLocation, soundSoulDepleted, 0.1f, 0.5f);
+                                }
+                                player.spawnParticle(Particle.REDSTONE, closestSoulLocation, 20, 0.2, 0.2, 0.2, SOUL_DUST_OPTIONS_GONE);
                             }
-                            player.spawnParticle(Particle.REDSTONE, closestSoul.location, 20, 0.2, 0.2, 0.2, SOUL_DUST_OPTIONS_GONE);
                         }
-                    } else if (playCallingSounds) {
-                        player.playSound(closestSoul.location, soundSoulCalling, volumeSoulCalling, 0.75f);
+                    } else if (playCallingSounds && closestSoulLocation != null) {
+                        player.playSound(closestSoulLocation, soundSoulCalling, volumeSoulCalling, 0.75f);
                     }
                     break;
                 }
@@ -327,10 +338,18 @@ public class DeadSouls extends JavaPlugin implements Listener {
         }
 
         try {
-            soulDatabase = new SoulDatabase(this, getDataFolder().toPath().resolve("souldb.bin"));
+            final Path dataFolder = getDataFolder().toPath();
+            final Path soulDb = dataFolder.resolve("soul-db.bin");
+            soulDatabase = new SoulDatabase(this, soulDb);
+
+            final Path legacySoulDb = dataFolder.resolve("souldb.bin");
+            if (Files.exists(legacySoulDb)) {
+                soulDatabase.loadLegacy(legacySoulDb);
+            }
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load soul database", e);
         }
+        soulDatabaseChanged = true;
 
         for (Player onlinePlayer : getServer().getOnlinePlayers()) {
             watchedPlayers.put(onlinePlayer, new PlayerSoulInfo());
@@ -427,7 +446,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
             watchedPlayers.put(player, info);
         }
         final Location soulLocation = info.findSafeSoulSpawnLocation(player);
-        final int soulId = soulDatabase.addSoul(player.getUniqueId(), soulLocation, soulItems, soulXp);
+        final int soulId = soulDatabase.addSoul(player.getUniqueId(), player.getWorld().getUID(),
+                soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp);
         soulDatabaseChanged = true;
 
         // Do not offer to free the soul if it will be free sooner than the player can click the button
@@ -500,13 +520,13 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     private static final class ComparatorSoulDistanceTo implements Comparator<SoulDatabase.Soul> {
 
-        int toX, toY, toZ;
+        double toX, toY, toZ;
 
         private int distanceTo(SoulDatabase.Soul s) {
-            final int x = toX - s.location.getBlockX();
-            final int y = toY - s.location.getBlockY();
-            final int z = toZ - s.location.getBlockZ();
-            return x*x + y*y + z*z;
+            final double x = toX - s.locationX;
+            final double y = toY - s.locationY;
+            final double z = toZ - s.locationZ;
+            return (int) Math.signum(x*x + y*y + z*z);
         }
 
         @Override
