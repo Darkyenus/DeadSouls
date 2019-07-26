@@ -34,6 +34,7 @@ import static com.darkyen.minecraft.Serialization.deserializeObject;
 import static com.darkyen.minecraft.Serialization.deserializeUUID;
 import static com.darkyen.minecraft.Serialization.serializeObject;
 import static com.darkyen.minecraft.Serialization.serializeUUID;
+import static com.darkyen.minecraft.Util.getWorld;
 import static com.darkyen.minecraft.Util.saturatedAdd;
 
 /**
@@ -202,10 +203,10 @@ public class SoulDatabase {
         }
     }
 
-    public void findSouls(World world, int x, int z, int radius, Collection<Soul> out) {
+    public void findSouls(@NotNull World world, int x, int z, int radius, Collection<Soul> out) {
         souls.query((x - radius) / SOUL_STORE_SCALE, (x + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE,
                 (z - radius) / SOUL_STORE_SCALE, (z + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE, out);
-        out.removeIf((soul) -> !soul.location.isWorldLoaded() || soul.location.getWorld() != world);
+        out.removeIf((soul) -> !world.equals(getWorld(soul.location)));
     }
 
     static final class Soul implements SpatialDatabase.Entry {
@@ -266,7 +267,7 @@ public class SoulDatabase {
     }
 
     static boolean serializeSoul(Soul soul, DataOutputChannel out) {
-        final World world = soul.location.getWorld();
+        final World world = getWorld(soul.location);
         if (world == null) {
             return false;
         }

@@ -39,6 +39,7 @@ import java.util.logging.Level;
 
 import static com.darkyen.minecraft.Util.distance2;
 import static com.darkyen.minecraft.Util.getTotalExperience;
+import static com.darkyen.minecraft.Util.getWorld;
 import static com.darkyen.minecraft.Util.isNear;
 import static com.darkyen.minecraft.Util.normalizeKey;
 import static com.darkyen.minecraft.Util.parseTimeMs;
@@ -122,8 +123,12 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 searchNewSouls = true;
             }
 
-            final World world = playerLocation.getWorld();
-            if (world != null) {
+            final World world = getWorld(playerLocation);
+            if (world == null) {
+                continue;
+            }
+
+            {
                 final Block underPlayer =
                         world.getBlockAt(playerLocation.getBlockX(), playerLocation.getBlockY() - 1, playerLocation.getBlockZ());
                 if (underPlayer.getType().isSolid()) {
@@ -140,7 +145,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             final ArrayList<SoulDatabase.Soul> visibleSouls = info.visibleSouls;
             if (searchNewSouls) {
                 visibleSouls.clear();
-                soulDatabase.findSouls(playerLocation.getWorld(), playerLocation.getBlockX(), playerLocation.getBlockZ(), 100, visibleSouls);
+                soulDatabase.findSouls(world, playerLocation.getBlockX(), playerLocation.getBlockZ(), 100, visibleSouls);
             }
 
             if (visibleSouls.isEmpty()) {

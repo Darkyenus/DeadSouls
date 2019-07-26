@@ -1,6 +1,7 @@
 package com.darkyen.minecraft;
 
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
@@ -20,26 +21,48 @@ public class Util {
         return queryMin <= quadMax && queryMax >= quadMin;
     }
 
+    @Nullable
+    public static World getWorld(@Nullable Location loc) {
+        if (loc == null) {
+            return null;
+        }
+        try {
+            if (!loc.isWorldLoaded()) {
+                return null;
+            }
+        } catch (Throwable ignored) {
+            // isWorldLoaded is not available on servers < 1.14
+        }
+        try {
+            return loc.getWorld();
+        } catch (Throwable ignored) {
+            // (>= 1.14) If the world gets unloaded between check above and now, this could throw, but it is unlikely.
+            return null;
+        }
+    }
 
     public static double distance2(@NotNull Location a, @NotNull Location b) {
-        if (!a.isWorldLoaded() || !b.isWorldLoaded() || a.getWorld() != b.getWorld()) {
+        final World aWorld = getWorld(a);
+        final World bWorld = getWorld(b);
+        if (aWorld == null || !aWorld.equals(bWorld)) {
             return Double.POSITIVE_INFINITY;
         }
         return NumberConversions.square(a.getX() - b.getX()) + NumberConversions.square(a.getY() - b.getY()) + NumberConversions.square(a.getZ() - b.getZ());
     }
 
     public static double distance2(@NotNull Location a, @NotNull Location b, double yScale) {
-        if (!a.isWorldLoaded() || !b.isWorldLoaded() || a.getWorld() != b.getWorld()) {
+        final World aWorld = getWorld(a);
+        final World bWorld = getWorld(b);
+        if (aWorld == null || !aWorld.equals(bWorld)) {
             return Double.POSITIVE_INFINITY;
         }
         return NumberConversions.square(a.getX() - b.getX()) + NumberConversions.square((a.getY() - b.getY()) * yScale) + NumberConversions.square(a.getZ() - b.getZ());
     }
 
     public static boolean isNear(@NotNull Location a, @NotNull Location b, float distance) {
-        if (!a.isWorldLoaded() || !b.isWorldLoaded()) {
-            return false;
-        }
-        if (a.getWorld() != b.getWorld()) {
+        final World aWorld = getWorld(a);
+        final World bWorld = getWorld(b);
+        if (aWorld == null || !aWorld.equals(bWorld)) {
             return false;
         }
         final double dst2 = NumberConversions.square(a.getX() - b.getX()) + NumberConversions.square(a.getZ() - b.getZ());
@@ -47,7 +70,7 @@ public class Util {
     }
 
     public static void set(@NotNull Location target, @NotNull Location source) {
-        target.setWorld(source.getWorld());
+        target.setWorld(getWorld(source));
         target.setX(source.getX());
         target.setY(source.getY());
         target.setZ(source.getZ());
