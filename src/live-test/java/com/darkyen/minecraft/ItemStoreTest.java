@@ -24,9 +24,11 @@ class ItemStoreTest {
 
     private static void testSerialization(ItemStack item) throws Exception {
         final SoulDatabase.Soul soul = new SoulDatabase.Soul(
-                random.nextBoolean() ? Bukkit.getOfflinePlayers()[0] : null,
-                new Location(Bukkit.getWorlds().get(0), random.nextInt(5000) - 2500, random.nextInt(250), random
-                        .nextInt(5000) - 2500),
+                random.nextBoolean() ? Bukkit.getOfflinePlayers()[0].getUniqueId() : null,
+                Bukkit.getWorlds().get(0).getUID(),
+                (double) random.nextInt(5000) - 2500,
+                (double) random.nextInt(250),
+                (double) random.nextInt(5000) - 2500,
                 random.nextLong(),
                 new ItemStack[]{item, item},
                 random.nextInt(1000)
@@ -37,9 +39,12 @@ class ItemStoreTest {
             Assertions.assertTrue(SoulDatabase.serializeSoul(soul, channel));
         }
         byteBufferChannel.position(0L);
-        final SoulDatabase.Soul soulFromHell = SoulDatabase.deserializeSoul(new DataInputChannel(byteBufferChannel));
+        final SoulDatabase.Soul soulFromHell = SoulDatabase.deserializeSoul(new DataInputChannel(byteBufferChannel), SoulDatabase.CURRENT_DB_VERSION);
 
-        Assertions.assertEquals(soul.location, soulFromHell.location);
+        Assertions.assertEquals(soul.locationWorld, soulFromHell.locationWorld);
+        Assertions.assertEquals(soul.locationX, soulFromHell.locationX);
+        Assertions.assertEquals(soul.locationY, soulFromHell.locationY);
+        Assertions.assertEquals(soul.locationZ, soulFromHell.locationZ);
         Assertions.assertEquals(soul.timestamp, soulFromHell.timestamp);
         Assertions.assertEquals(soul.xp, soulFromHell.xp);
         Assertions.assertEquals(soul.owner, soulFromHell.owner);

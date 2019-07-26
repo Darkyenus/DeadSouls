@@ -574,16 +574,16 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         double toX, toY, toZ;
 
-        private int distanceTo(SoulDatabase.Soul s) {
+        private double distanceTo(SoulDatabase.Soul s) {
             final double x = toX - s.locationX;
             final double y = toY - s.locationY;
             final double z = toZ - s.locationZ;
-            return (int) Math.signum(x*x + y*y + z*z);
+            return x*x + y*y + z*z;
         }
 
         @Override
         public int compare(SoulDatabase.Soul o1, SoulDatabase.Soul o2) {
-            return Integer.compare(distanceTo(o1), distanceTo(o2));
+            return Double.compare(distanceTo(o1), distanceTo(o2));
         }
     }
 

@@ -17,7 +17,7 @@ val DeadSouls by project(Archetypes.JavaProject) {
 
 	projectGroup set { "com.darkyen.minecraft" }
 	projectName set { "DeadSouls" }
-	projectVersion set { "1.0" }
+	projectVersion set { "1.1" }
 
 	repositories add { Repository("spigot-repo", "https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
 	repositories add { Jitpack }
@@ -31,7 +31,7 @@ val DeadSouls by project(Archetypes.JavaProject) {
 	extend(testing) {
 		libraryDependencies add { JUnitAPI }
 		libraryDependencies add { JUnitEngine }
-		libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.14.2-R0.1-SNAPSHOT") }
+		libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.14.4-R0.1-SNAPSHOT") }
 	}
 
 	assemblyOutputFile set { WemiBuildFolder / "DeadSouls-${projectVersion.get()}.jar" }

@@ -46,7 +46,7 @@ public class SoulDatabase {
 
     private static final Logger LOG = Logger.getLogger("DeadSouls-ItemStore");
 
-    private static final int CURRENT_DB_VERSION = 1;
+    static final int CURRENT_DB_VERSION = 1;
 
     @NotNull
     private final Plugin owner;
@@ -135,7 +135,9 @@ public class SoulDatabase {
                 // File written, now we can replace the old one
                 Files.move(writeFile, databaseFile, StandardCopyOption.REPLACE_EXISTING);
 
-                LOG.log(Level.WARNING, failedWrites+" soul(s) failed to save");
+                if (failedWrites > 0) {
+                    LOG.log(Level.WARNING, failedWrites + " soul(s) failed to save");
+                }
                 return true;
             }
             LOG.log(Level.SEVERE, "Failed to save souls", exception);
