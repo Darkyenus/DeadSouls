@@ -12,3 +12,9 @@ permissions:
   com.darkyen.minecraft.deadsouls.hassoul:
     description: Has soul that holds onto their items.
     default: true
+  com.darkyen.minecraft.deadsouls.hassoul.xp:
+    description: If the player has a soul, it stores their XP
+    default: true
+  com.darkyen.minecraft.deadsouls.hassoul.items:
+    description: If the player has a soul, it stores their items
+    default: true

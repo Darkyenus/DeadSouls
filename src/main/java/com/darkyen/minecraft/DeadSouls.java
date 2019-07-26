@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.logging.Level;
@@ -409,16 +410,21 @@ public class DeadSouls extends JavaPlugin implements Listener {
         }
 
         final ItemStack[] soulItems;
-        if (!event.getKeepInventory() || event.getDrops().isEmpty()) {
-            soulItems = event.getDrops().toArray(NO_ITEM_STACKS);
-            event.getDrops().clear();
-        } else {
+        if (event.getKeepInventory() || !player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul.items")) {
+            // We don't modify drops for this death at all
             soulItems = NO_ITEM_STACKS;
+        } else {
+            final List<ItemStack> drops = event.getDrops();
+            soulItems = drops.toArray(NO_ITEM_STACKS);
+            drops.clear();
         }
 
 
         int soulXp;
-        if (!event.getKeepLevel()) {
+        if (event.getKeepLevel() || !player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul.xp")) {
+            // We don't modify XP for this death at all
+            soulXp = 0;
+        } else {
             final int totalExperience = getTotalExperience(player);
             if (retainedXPPercent >= 0) {
                 soulXp = Math.round(totalExperience * retainedXPPercent);
@@ -430,8 +436,6 @@ public class DeadSouls extends JavaPlugin implements Listener {
             event.setNewLevel(0);
             event.setNewTotalExp(0);
             event.setDroppedExp(0);
-        } else {
-            soulXp = 0;
         }
 
         if (soulXp == 0 && soulItems.length == 0) {
