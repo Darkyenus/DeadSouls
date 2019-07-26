@@ -167,7 +167,7 @@ public class SoulDatabase {
         return fadedSouls;
     }
 
-    public int addSoul(@NotNull UUID owner, @NotNull UUID world, double x, double y, double z, ItemStack[] contents, int xp) {
+    public int addSoul(@Nullable UUID owner, @NotNull UUID world, double x, double y, double z, ItemStack[] contents, int xp) {
         final Soul soul = new Soul(owner, world, x, y, z, System.currentTimeMillis(), contents, xp);
         int soulId = -1;
         synchronized (soulsById) {

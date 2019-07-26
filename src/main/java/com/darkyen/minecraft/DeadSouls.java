@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.logging.Level;
 
 import static com.darkyen.minecraft.Util.distance2;
@@ -79,6 +80,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private String textFreeMySoulTooltip = DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP;
 
     private boolean soulFreeingEnabled = true;
+
+    private PvPBehavior pvpBehavior = PvPBehavior.NORMAL;
 
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
     private boolean soulDatabaseChanged = false;
@@ -314,6 +317,27 @@ public class DeadSouls extends JavaPlugin implements Listener {
         textFreeMySoulTooltip = config.getString("text-free-my-soul-tooltip", DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP);
         soulFreeingEnabled = textFreeMySoul != null && !textFreeMySoul.isEmpty();
 
+        {
+            String pvpBehaviorString = config.getString("pvp-behavior");
+            if (pvpBehaviorString == null) {
+                pvpBehavior = PvPBehavior.NORMAL;
+            } else {
+                try {
+                    pvpBehavior = PvPBehavior.valueOf(pvpBehaviorString.trim().toUpperCase());
+                } catch (IllegalArgumentException ex) {
+                    pvpBehavior = PvPBehavior.NORMAL;
+                    final StringBuilder sb = new StringBuilder(128);
+                    sb.append("Unrecognized pvp-behavior: '").append(pvpBehaviorString).append("'. ");
+                    sb.append("Allowed values are: ");
+                    for (PvPBehavior value : PvPBehavior.values()) {
+                        sb.append(value.name().toLowerCase()).append(", ");
+                    }
+                    sb.setLength(sb.length() - 2);
+                    getLogger().log(Level.WARNING, sb.toString());
+                }
+            }
+        }
+
         saveDefaultConfig();
 
         getServer().getPluginManager().registerEvents(this, this);
@@ -409,6 +433,11 @@ public class DeadSouls extends JavaPlugin implements Listener {
             return;
         }
 
+        final boolean pvp = player.getKiller() != null && !player.equals(player.getKiller());
+        if (pvp && pvpBehavior == PvPBehavior.DISABLED) {
+            return;
+        }
+
         final ItemStack[] soulItems;
         if (event.getKeepInventory() || !player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul.items")) {
             // We don't modify drops for this death at all
@@ -450,12 +479,17 @@ public class DeadSouls extends JavaPlugin implements Listener {
             watchedPlayers.put(player, info);
         }
         final Location soulLocation = info.findSafeSoulSpawnLocation(player);
-        final int soulId = soulDatabase.addSoul(player.getUniqueId(), player.getWorld().getUID(),
+        UUID owner = player.getUniqueId();
+        if (pvp && pvpBehavior == PvPBehavior.FREE) {
+            owner = null;
+        }
+
+        final int soulId = soulDatabase.addSoul(owner, player.getWorld().getUID(),
                 soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp);
         soulDatabaseChanged = true;
 
         // Do not offer to free the soul if it will be free sooner than the player can click the button
-        if (soulFreeAfterMs > 1000 && soulFreeingEnabled && textFreeMySoul != null && !textFreeMySoul.isEmpty()) {
+        if (owner != null && soulFreeAfterMs > 1000 && soulFreeingEnabled && textFreeMySoul != null && !textFreeMySoul.isEmpty()) {
             final TextComponent star = new TextComponent("✦");
             star.setColor(ChatColor.YELLOW);
             final TextComponent freeMySoul = new TextComponent(" "+textFreeMySoul+" ");
@@ -537,5 +571,14 @@ public class DeadSouls extends JavaPlugin implements Listener {
         public int compare(SoulDatabase.Soul o1, SoulDatabase.Soul o2) {
             return Integer.compare(distanceTo(o1), distanceTo(o2));
         }
+    }
+
+    private enum PvPBehavior {
+        /** no change */
+        NORMAL,
+        /** souls are not created in PvP, items and XP drops like in vanilla Minecraft */
+        DISABLED,
+        /** created souls are immediately free and can be collected by anyone */
+        FREE
     }
 }

@@ -13,6 +13,12 @@ soul-free-after: 1h
 # <time> after which the soul disappears
 soul-fades-after: never
 
+# How the souls behave in PvP. Possible values:
+#   normal: no change
+#   disabled: souls are not created in PvP, items and XP drops like in vanilla Minecraft
+#   free: created souls are immediately free and can be collected by anyone
+pvp-behavior: normal
+
 # <percent> of experience points retained by souls
 # OR <xp-per-level> to retain by soul. Vanilla behavior is 7 xp-per-level.
 # Soul will never retain more xp than the player has collected.
