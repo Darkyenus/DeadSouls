@@ -1,5 +1,6 @@
 package com.darkyen.minecraft;
 
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -142,6 +143,24 @@ public class Util {
             return "";
         }
         return sound.replaceAll("[^_./:0-9A-Za-z-]+", "").toLowerCase();
+    }
+
+    @NotNull
+    public static Color parseColor(@Nullable String color, @NotNull Color defaultColor, @NotNull Logger log) {
+        if (color == null) {
+            return defaultColor;
+        }
+        final String colorHex = color.replaceAll("[^0-9A-Fa-f]+", "");
+        if (colorHex.length() != 6) {
+            log.log(Level.WARNING, "Invalid color: '"+color+"' - must be hexadecimal number in RRGGBB format");
+            return defaultColor;
+        }
+        try {
+            return Color.fromRGB(Integer.parseInt(color, 16) & 0xFF_FF_FF);
+        } catch (NumberFormatException nfe) {
+            log.log(Level.WARNING, "Invalid color: '"+color+"' - must be hexadecimal number in RRGGBB format");
+            return defaultColor;
+        }
     }
 
     // https://stackoverflow.com/a/2633161

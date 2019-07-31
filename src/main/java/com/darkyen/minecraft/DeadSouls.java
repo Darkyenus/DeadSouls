@@ -45,6 +45,7 @@ import static com.darkyen.minecraft.Util.distance2;
 import static com.darkyen.minecraft.Util.getTotalExperience;
 import static com.darkyen.minecraft.Util.isNear;
 import static com.darkyen.minecraft.Util.normalizeKey;
+import static com.darkyen.minecraft.Util.parseColor;
 import static com.darkyen.minecraft.Util.parseTimeMs;
 import static com.darkyen.minecraft.Util.set;
 
@@ -84,14 +85,23 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     private PvPBehavior pvpBehavior = PvPBehavior.NORMAL;
 
+    private static final Color DEFAULT_SOUL_DUST_COLOR_ITEMS = Color.WHITE;
+    private static final float DEFAULT_SOUL_DUST_SIZE_ITEMS = 2f;
+    private static final Color DEFAULT_SOUL_DUST_COLOR_XP = Color.AQUA;
+    private static final float DEFAULT_SOUL_DUST_SIZE_XP = 2f;
+    private static final Color DEFAULT_SOUL_DUST_COLOR_GONE = Color.YELLOW;
+    private static final float DEFAULT_SOUL_DUST_SIZE_GONE = 3f;
+    @NotNull
+    private Particle.DustOptions soulDustOptionsItems = new Particle.DustOptions(DEFAULT_SOUL_DUST_COLOR_ITEMS, DEFAULT_SOUL_DUST_SIZE_ITEMS);
+    @NotNull
+    private Particle.DustOptions soulDustOptionsXp = new Particle.DustOptions(DEFAULT_SOUL_DUST_COLOR_XP, DEFAULT_SOUL_DUST_SIZE_XP);
+    @NotNull
+    private Particle.DustOptions soulDustOptionsGone = new Particle.DustOptions(DEFAULT_SOUL_DUST_COLOR_GONE, DEFAULT_SOUL_DUST_SIZE_GONE);
+
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
     private boolean soulDatabaseChanged = false;
 
     private static final double COLLECTION_DISTANCE2 = NumberConversions.square(1);
-
-    private static final Particle.DustOptions SOUL_DUST_OPTIONS_ITEMS = new Particle.DustOptions(Color.WHITE, 2f);
-    private static final Particle.DustOptions SOUL_DUST_OPTIONS_XP = new Particle.DustOptions(Color.AQUA, 2f);
-    private static final Particle.DustOptions SOUL_DUST_OPTIONS_GONE = new Particle.DustOptions(Color.YELLOW, 3f);
 
     private static final ItemStack[] NO_ITEM_STACKS = new ItemStack[0];
     private final ComparatorSoulDistanceTo processPlayers_comparatorDistanceTo = new ComparatorSoulDistanceTo();
@@ -181,14 +191,14 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
                 // Show this soul!
                 if (soul.xp > 0 && soul.items.length > 0) {
-                    player.spawnParticle(Particle.REDSTONE, soulLocation, 10, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_ITEMS);
-                    player.spawnParticle(Particle.REDSTONE, soulLocation, 10, 0.12, 0.12, 0.12, SOUL_DUST_OPTIONS_XP);
+                    player.spawnParticle(Particle.REDSTONE, soulLocation, 10, 0.1, 0.1, 0.1, soulDustOptionsItems);
+                    player.spawnParticle(Particle.REDSTONE, soulLocation, 10, 0.12, 0.12, 0.12, soulDustOptionsXp);
                 } else if (soul.xp > 0) {
                     // Only xp
-                    player.spawnParticle(Particle.REDSTONE, soulLocation, 20, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_XP);
+                    player.spawnParticle(Particle.REDSTONE, soulLocation, 20, 0.1, 0.1, 0.1, soulDustOptionsXp);
                 } else {
                     // Only items
-                    player.spawnParticle(Particle.REDSTONE, soulLocation, 20, 0.1, 0.1, 0.1, SOUL_DUST_OPTIONS_ITEMS);
+                    player.spawnParticle(Particle.REDSTONE, soulLocation, 20, 0.1, 0.1, 0.1, soulDustOptionsItems);
                 }
                 remainingSoulsToShow--;
             }
@@ -252,7 +262,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                                 if (!soundSoulDepleted.isEmpty()) {
                                     player.playSound(closestSoulLocation, soundSoulDepleted, 0.1f, 0.5f);
                                 }
-                                player.spawnParticle(Particle.REDSTONE, closestSoulLocation, 20, 0.2, 0.2, 0.2, SOUL_DUST_OPTIONS_GONE);
+                                player.spawnParticle(Particle.REDSTONE, closestSoulLocation, 20, 0.2, 0.2, 0.2, soulDustOptionsGone);
                             }
                         }
                     } else if (playCallingSounds && closestSoulLocation != null) {
@@ -310,6 +320,10 @@ public class DeadSouls extends JavaPlugin implements Listener {
         soundSoulCalling = normalizeKey(config.getString("sound-soul-calling", DEFAULT_SOUND_SOUL_CALLING));
         soundSoulDropped = normalizeKey(config.getString("sound-soul-dropped", DEFAULT_SOUND_SOUL_DROPPED));
         volumeSoulCalling = (float)config.getDouble("volume-soul-calling", DEFAULT_VOLUME_SOUL_CALLING);
+
+        soulDustOptionsItems = new Particle.DustOptions(parseColor(config.getString("color-soul-items"), DEFAULT_SOUL_DUST_COLOR_ITEMS, getLogger()), DEFAULT_SOUL_DUST_SIZE_ITEMS);
+        soulDustOptionsXp = new Particle.DustOptions(parseColor(config.getString("color-soul-xp"), DEFAULT_SOUL_DUST_COLOR_XP, getLogger()), DEFAULT_SOUL_DUST_SIZE_XP);
+        soulDustOptionsGone = new Particle.DustOptions(parseColor(config.getString("color-soul-gone"), DEFAULT_SOUL_DUST_COLOR_GONE, getLogger()), DEFAULT_SOUL_DUST_SIZE_GONE);
 
         textFreeMySoul = config.getString("text-free-my-soul", DEFAULT_TEXT_FREE_MY_SOUL);
         textFreeMySoulTooltip = config.getString("text-free-my-soul-tooltip", DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP);
@@ -528,7 +542,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
     }
 
     private static final class PlayerSoulInfo {
-        public static final double SOUL_HOVER_OFFSET = 1.2;
+        static final double SOUL_HOVER_OFFSET = 1.2;
 
         @NotNull
         final Location lastKnownLocation = new Location(null, 0, 0, 0);

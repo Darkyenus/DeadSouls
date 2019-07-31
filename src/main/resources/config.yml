@@ -5,8 +5,7 @@
 #        | "m" (minutes)
 #        | "h" (hours)
 #        | "d" (days)
-# <percent> = <number> "%"
-# <xp-per-level> = <number>
+
 
 # <time> after which the soul can be collected by anyone
 soul-free-after: 1h
@@ -18,6 +17,9 @@ soul-fades-after: never
 #   disabled: souls are not created in PvP, items and XP drops like in vanilla Minecraft
 #   free: created souls are immediately free and can be collected by anyone
 pvp-behavior: normal
+
+# <percent> = <number> "%"
+# <xp-per-level> = <number>
 
 # <percent> of experience points retained by souls
 # OR <xp-per-level> to retain by soul. Vanilla behavior is 7 xp-per-level.
@@ -43,6 +45,20 @@ volume-soul-calling: 16
 # Sound played to dying players that drop a soul
 # NOTE FOR 1.13 USERS: This sound exists only since 1.14, suggested replacement is: block.beacon.power_select
 sound-soul-dropped: block.bell.resonate
+
+# Color: HTML-like color in RRGGBB format (without leading #).
+# Somewhat nice color picker is available here: https://www.colorcodehex.com/html-color-picker.html
+# For example:
+#   FF0000 - pure red
+#   00FF00 - pure green
+#   0000FF - pure blue
+#   71B05F - sickly green
+# Color of the soul when it holds items (default: pure white)
+color-soul-items: FFFFFF
+# Color of the soul when it holds XP (default: pure aqua/cyan)
+color-soul-xp: 00FFFF
+# Color of the soul when it disappears (default: pure yellow)
+color-soul-gone: FFFF00
 
 # Text on a button to free the soul (Set to empty to disable this functionality)
 text-free-my-soul: "Free my soul"
