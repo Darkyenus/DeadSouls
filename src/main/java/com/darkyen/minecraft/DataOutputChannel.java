@@ -16,10 +16,15 @@ import java.nio.channels.SeekableByteChannel;
 public class DataOutputChannel implements DataOutput, Channel {
 
     private final SeekableByteChannel chn;
-    private final ByteBuffer buffer = ByteBuffer.allocate(4096).order(ByteOrder.BIG_ENDIAN);
+    private final ByteBuffer buffer;
+
+    public DataOutputChannel(SeekableByteChannel chn, int bufferSize) {
+        this.chn = chn;
+        buffer = ByteBuffer.allocate(bufferSize).order(ByteOrder.BIG_ENDIAN);
+    }
 
     public DataOutputChannel(SeekableByteChannel chn) {
-        this.chn = chn;
+        this(chn, 4096);
     }
 
     public long position() throws IOException {
@@ -165,19 +170,44 @@ public class DataOutputChannel implements DataOutput, Channel {
             throw new UTFDataFormatException("encoded string too long: " + utfLength + " bytes");
 
         final ByteBuffer buffer = this.buffer;
-        buffer.putShort((short)utfLength);
+        if (this.buffer.capacity() < 2 + utfLength) {
+            // Fast path
+            require(2 + utfLength);
+            buffer.putShort((short)utfLength);
 
-        for (int i = 0; i < charLength; i++){
-            char c = str.charAt(i);
-            if ((c >= 0x0001) && (c <= 0x007F)) {
-                buffer.put((byte)c);
-            } else if (c > 0x07FF) {
-                buffer.put((byte)(0xE0 | ((c >> 12) & 0x0F)));
-                buffer.put((byte)(0x80 | ((c >>  6) & 0x3F)));
-                buffer.put((byte)(0x80 | ((c) & 0x3F)));
-            } else {
-                buffer.put((byte) (0xC0 | ((c >>  6) & 0x1F)));
-                buffer.put((byte) (0x80 | ((c) & 0x3F)));
+            for (int i = 0; i < charLength; i++){
+                char c = str.charAt(i);
+                if ((c >= 0x0001) && (c <= 0x007F)) {
+                    buffer.put((byte)c);
+                } else if (c > 0x07FF) {
+                    buffer.put((byte)(0xE0 | ((c >> 12) & 0x0F)));
+                    buffer.put((byte)(0x80 | ((c >>  6) & 0x3F)));
+                    buffer.put((byte)(0x80 | ((c) & 0x3F)));
+                } else {
+                    buffer.put((byte) (0xC0 | ((c >>  6) & 0x1F)));
+                    buffer.put((byte) (0x80 | ((c) & 0x3F)));
+                }
+            }
+        } else {
+            // Slow path
+            require(2);
+            buffer.putShort((short)utfLength);
+
+            for (int i = 0; i < charLength; i++){
+                char c = str.charAt(i);
+                if ((c >= 0x0001) && (c <= 0x007F)) {
+                    require(1);
+                    buffer.put((byte)c);
+                } else if (c > 0x07FF) {
+                    require(3);
+                    buffer.put((byte)(0xE0 | ((c >> 12) & 0x0F)));
+                    buffer.put((byte)(0x80 | ((c >>  6) & 0x3F)));
+                    buffer.put((byte)(0x80 | ((c) & 0x3F)));
+                } else {
+                    require(2);
+                    buffer.put((byte) (0xC0 | ((c >>  6) & 0x1F)));
+                    buffer.put((byte) (0x80 | ((c) & 0x3F)));
+                }
             }
         }
     }

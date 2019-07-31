@@ -17,11 +17,16 @@ import java.nio.channels.SeekableByteChannel;
 public class DataInputChannel implements DataInput, Channel {
 
     private final SeekableByteChannel chn;
-    private final ByteBuffer buffer = ByteBuffer.allocate(4096).order(ByteOrder.BIG_ENDIAN);
+    private final ByteBuffer buffer;
+
+    public DataInputChannel(SeekableByteChannel chn, int bufferSize) {
+        this.chn = chn;
+        buffer = ByteBuffer.allocate(bufferSize).order(ByteOrder.BIG_ENDIAN);
+        this.buffer.limit(0);
+    }
 
     public DataInputChannel(SeekableByteChannel chn) {
-        this.chn = chn;
-        this.buffer.limit(0);
+        this(chn, 4096);
     }
 
     public long position() throws IOException {
@@ -43,14 +48,12 @@ public class DataInputChannel implements DataInput, Channel {
         final ByteBuffer buffer = this.buffer;
         if (buffer.remaining() < bytes) {
             buffer.compact();
-            final int readPosition = buffer.position();
             do {
                 if (chn.read(buffer) <= 0) {
                     break;
                 }
             } while (buffer.hasRemaining());
             buffer.flip();
-            buffer.position(readPosition);
         }
     }
 
