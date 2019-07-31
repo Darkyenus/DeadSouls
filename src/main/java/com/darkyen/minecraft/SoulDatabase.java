@@ -69,20 +69,26 @@ public class SoulDatabase {
             if (version > CURRENT_DB_VERSION || version < 0) {
                 throw new Serialization.Exception("Invalid database version, please upgrade the plugin");
             }
+            int soulCount = 0;
             while (in.hasRemaining()) {
                 final Soul soul = deserializeSoul(in, version);
                 soulsById.add(soul);
                 souls.insert(soul);
+                soulCount++;
             }
+
+            LOG.log(Level.INFO, "Soul database loaded ("+soulCount+" souls, db version "+version+")");
         } catch (NoSuchFileException ignored) {}
     }
 
     public void loadLegacy(Path databaseFile) throws IOException, Serialization.Exception {
+        int soulCount = 0;
         try (DataInputChannel in = new DataInputChannel(Files.newByteChannel(databaseFile, StandardOpenOption.READ))) {
             while (in.hasRemaining()) {
                 final Soul soul = deserializeSoul(in, 0);
                 soulsById.add(soul);
                 souls.insert(soul);
+                soulCount++;
             }
         } catch (NoSuchFileException ignored) {
             return;
@@ -91,7 +97,7 @@ public class SoulDatabase {
         // Loaded successfully, save and delete legacy
         if (save()) {
             Files.deleteIfExists(databaseFile);
-            LOG.log(Level.INFO, "Soul database migrated");
+            LOG.log(Level.INFO, "Soul database migrated ("+soulCount+" souls)");
         }
     }
 

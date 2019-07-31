@@ -43,7 +43,6 @@ import java.util.logging.Level;
 
 import static com.darkyen.minecraft.Util.distance2;
 import static com.darkyen.minecraft.Util.getTotalExperience;
-import static com.darkyen.minecraft.Util.getWorld;
 import static com.darkyen.minecraft.Util.isNear;
 import static com.darkyen.minecraft.Util.normalizeKey;
 import static com.darkyen.minecraft.Util.parseTimeMs;
@@ -131,10 +130,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 searchNewSouls = true;
             }
 
-            final World world = getWorld(playerLocation);
-            if (world == null) {
-                continue;
-            }
+            final World world = player.getWorld();
 
             {
                 final Block underPlayer =
@@ -452,7 +448,6 @@ public class DeadSouls extends JavaPlugin implements Listener {
             drops.clear();
         }
 
-
         int soulXp;
         if (event.getKeepLevel() || !player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul.xp")) {
             // We don't modify XP for this death at all
@@ -476,26 +471,25 @@ public class DeadSouls extends JavaPlugin implements Listener {
             return;
         }
 
-        PlayerSoulInfo info = watchedPlayers.get(player);
-        if (info == null) {
-            getLogger().log(Level.WARNING, "Player "+player+" was not watched!");
-            info = new PlayerSoulInfo();
-            watchedPlayers.put(player, info);
-        }
         final Location soulLocation;
         if (smartSoulPlacement) {
+            PlayerSoulInfo info = watchedPlayers.get(player);
+            if (info == null) {
+                getLogger().log(Level.WARNING, "Player "+player+" was not watched!");
+                info = new PlayerSoulInfo();
+                watchedPlayers.put(player, info);
+            }
             soulLocation = info.findSafeSoulSpawnLocation(player);
             info.lastSafeLocation.setWorld(null); // Reset it, so it isn't used twice
         } else {
-            soulLocation = player.getLocation();
-            if (soulLocation.getY() < 0) {
-                soulLocation.setY(0);
-            }
-            soulLocation.setY(soulLocation.getY() + 1.2);
+            soulLocation = PlayerSoulInfo.findFallbackSoulSpawnLocation(player, player.getLocation(), false);
         }
-        UUID owner = player.getUniqueId();
-        if (pvp && pvpBehavior == PvPBehavior.FREE) {
+
+        final UUID owner;
+        if ((pvp && pvpBehavior == PvPBehavior.FREE) || soulFreeAfterMs <= 0) {
             owner = null;
+        } else {
+            owner = player.getUniqueId();
         }
 
         final int soulId = soulDatabase.addSoul(owner, player.getWorld().getUID(),
@@ -534,6 +528,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
     }
 
     private static final class PlayerSoulInfo {
+        public static final double SOUL_HOVER_OFFSET = 1.2;
+
         @NotNull
         final Location lastKnownLocation = new Location(null, 0, 0, 0);
 
@@ -543,29 +539,51 @@ public class DeadSouls extends JavaPlugin implements Listener {
         final ArrayList<SoulDatabase.Soul> visibleSouls = new ArrayList<>();
 
         Location findSafeSoulSpawnLocation(Player player) {
-            final double soulHoverOffset = 1.2;
-
             final Location playerLocation = player.getLocation();
             if (isNear(lastSafeLocation, playerLocation, 20)) {
                 set(playerLocation, lastSafeLocation);
-                playerLocation.setY(playerLocation.getY() + soulHoverOffset);
+                playerLocation.setY(playerLocation.getY() + SOUL_HOVER_OFFSET);
                 return playerLocation;
             }
+
             // Too far, now we have to find a better location
+            return findFallbackSoulSpawnLocation(player, playerLocation, true);
+        }
+
+        static Location findFallbackSoulSpawnLocation(Player player, Location playerLocation, boolean improve) {
             final World world = player.getWorld();
+
             final int x = playerLocation.getBlockX();
-            int y = playerLocation.getBlockY();
+            int y = Util.clamp(playerLocation.getBlockY(), 0, world.getMaxHeight());
             final int z = playerLocation.getBlockZ();
-            while (true) {
-                final Block blockAt = world.getBlockAt(x, y, z);
-                if (blockAt.getType() == Material.LAVA) {
-                    y++;
-                } else {
-                    break;
+
+            if (improve) {
+                int yOff = 0;
+                while (true) {
+                    final Material type = world.getBlockAt(x, y + yOff, z).getType();
+                    if (type.isSolid()) {
+                        // Soul either started in a block or ended in it, do not want
+                        yOff = 0;
+                        break;
+                    } else if (type == Material.LAVA) {
+                        yOff++;
+
+                        if (yOff > 8) {
+                            // Probably dead in a lava column, we don't want to push it up
+                            yOff = 0;
+                            break;
+                        }
+                        // continue
+                    } else {
+                        // This place looks good
+                        break;
+                    }
                 }
+
+                y += yOff;
             }
 
-            playerLocation.setY(y + soulHoverOffset);
+            playerLocation.setY(y + SOUL_HOVER_OFFSET);
             return playerLocation;
         }
     }
