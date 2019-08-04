@@ -204,7 +204,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
             }
 
             // Process collisions
-            if (!player.isDead() && player.getGameMode() == GameMode.SURVIVAL) {
+            final GameMode gameMode = player.getGameMode();
+            if (!player.isDead() && (gameMode == GameMode.SURVIVAL || gameMode == GameMode.ADVENTURE)) {
                 //noinspection ForLoopReplaceableByForEach
                 for (int soulI = 0; soulI < visibleSouls.size(); soulI++) {
                     final SoulDatabase.Soul closestSoul = visibleSouls.get(soulI);
