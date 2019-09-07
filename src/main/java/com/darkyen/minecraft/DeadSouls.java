@@ -486,18 +486,24 @@ public class DeadSouls extends JavaPlugin implements Listener {
             return;
         }
 
-        final Location soulLocation;
-        if (smartSoulPlacement) {
-            PlayerSoulInfo info = watchedPlayers.get(player);
-            if (info == null) {
-                getLogger().log(Level.WARNING, "Player "+player+" was not watched!");
-                info = new PlayerSoulInfo();
-                watchedPlayers.put(player, info);
+        Location soulLocation;
+        try {
+            if (smartSoulPlacement) {
+                PlayerSoulInfo info = watchedPlayers.get(player);
+                if (info == null) {
+                    getLogger().log(Level.WARNING, "Player " + player + " was not watched!");
+                    info = new PlayerSoulInfo();
+                    watchedPlayers.put(player, info);
+                }
+                soulLocation = info.findSafeSoulSpawnLocation(player);
+                info.lastSafeLocation.setWorld(null); // Reset it, so it isn't used twice
+            } else {
+                soulLocation = PlayerSoulInfo.findFallbackSoulSpawnLocation(player, player.getLocation(), false);
             }
-            soulLocation = info.findSafeSoulSpawnLocation(player);
-            info.lastSafeLocation.setWorld(null); // Reset it, so it isn't used twice
-        } else {
-            soulLocation = PlayerSoulInfo.findFallbackSoulSpawnLocation(player, player.getLocation(), false);
+        } catch (Exception bugException) {
+            // Should never happen, but just in case!
+            getLogger().log(Level.SEVERE, "Failed to find soul location, defaulting to player location!", bugException);
+            soulLocation = player.getLocation();
         }
 
         final UUID owner;
