@@ -1,6 +1,7 @@
 package com.darkyen.minecraft;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,6 +19,7 @@ public final class SpatialDatabase<E extends SpatialDatabase.Entry> {
     private static final int CHUNK_BUCKET_LEVEL = 7;
     private static final int MAX_QUAD_SIZE = 16;
 
+    @NotNull
     @SuppressWarnings("unchecked")
     private ChunkBucket<E>[] buckets = new ChunkBucket[16];
     private int bucketCount = 0;
@@ -98,7 +100,7 @@ public final class SpatialDatabase<E extends SpatialDatabase.Entry> {
         return buckets[bucketI].remove(x, y, 1 << CHUNK_BUCKET_LEVEL, entry);
     }
 
-    public void query(int xMin, int xMax, int yMin, int yMax, Collection<E> out) {
+    public void query(int xMin, int xMax, int yMin, int yMax, @NotNull Collection<E> out) {
         final ChunkBucket<E>[] buckets = this.buckets;
         final int bucketCount = this.bucketCount;
 
@@ -139,6 +141,7 @@ public final class SpatialDatabase<E extends SpatialDatabase.Entry> {
         }
     }
 
+    @NotNull
     public List<E> toList() {
         final ArrayList<E> result = new ArrayList<>();
         final int bucketCount = this.bucketCount;

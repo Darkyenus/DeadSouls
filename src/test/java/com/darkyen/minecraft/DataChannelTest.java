@@ -30,7 +30,14 @@ public final class DataChannelTest {
     void primitives() throws IOException {
         final ByteBufferChannel byteChn = new ByteBufferChannel();
 
-        try (DataOutputChannel out = new DataOutputChannel(byteChn)){
+        StringBuilder largeStringBuilder = new StringBuilder();
+        for (int i = 0; i < 50; i++) {
+            largeStringBuilder.append("QWERTZUIOPLKJHGFDSAYXCVBNM");
+        }
+        // Large string to trigger slow path by being longer than output and input buffer
+        String largeString = largeStringBuilder.toString();
+
+        try (DataOutputChannel out = new DataOutputChannel(byteChn, 128)){
             out.writeBoolean(true);
             out.writeBoolean(false);
             out.writeByte(1);
@@ -49,11 +56,12 @@ public final class DataChannelTest {
             out.writeLong(123456789012345L);
             out.writeFloat(1234f);
             out.writeDouble(1234.0);
+            out.writeUTF(largeString);
         }
 
         byteChn.position(0);
 
-        try (DataInputChannel in = new DataInputChannel(byteChn)) {
+        try (DataInputChannel in = new DataInputChannel(byteChn, 128)) {
             assertTrue(in.readBoolean());
             assertFalse(in.readBoolean());
             assertEquals(1, in.readByte());
@@ -72,6 +80,7 @@ public final class DataChannelTest {
             assertEquals(123456789012345L, in.readLong());
             assertEquals(1234f, in.readFloat());
             assertEquals(1234.0, in.readDouble());
+            assertEquals(largeString, in.readUTF());
         }
     }
 

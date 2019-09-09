@@ -52,7 +52,9 @@ public class SoulDatabase {
 
     @Nullable
     private final Plugin owner;
+    @NotNull
     private final SpatialDatabase<@NotNull Soul> souls = new SpatialDatabase<>();
+    @NotNull
     private final ArrayList<@Nullable Soul> soulsById = new ArrayList<>();
     @NotNull
     private final Path databaseFile;
@@ -67,15 +69,17 @@ public class SoulDatabase {
 				souls.insert(soul);
 			}
 		} catch (Exception e) {
-			LOG.log(Level.SEVERE, "Failed to load legacy soul database, old souls will not be present", e);
+			LOG.log(Level.SEVERE, "Failed to load soul database, souls will not be present", e);
 		}
 	}
 
+    @NotNull
     public List<@Nullable Soul> getSoulsById() {
 	    return soulsById;
     }
 
-    public static List<Soul> load(Path databaseFile) throws IOException, Serialization.Exception {
+    @NotNull
+    public static List<Soul> load(@NotNull Path databaseFile) throws IOException, Serialization.Exception {
         final ArrayList<Soul> result = new ArrayList<>();
         try (DataInputChannel in = new DataInputChannel(Files.newByteChannel(databaseFile, StandardOpenOption.READ))) {
             final int version = in.readInt();
@@ -94,7 +98,7 @@ public class SoulDatabase {
         return result;
     }
 
-    public void loadLegacy(Path databaseFile) throws IOException, Serialization.Exception {
+    public void loadLegacy(@NotNull Path databaseFile) throws IOException, Serialization.Exception {
         int soulCount = 0;
         try (DataInputChannel in = new DataInputChannel(Files.newByteChannel(databaseFile, StandardOpenOption.READ))) {
             while (in.hasRemaining()) {
@@ -114,6 +118,7 @@ public class SoulDatabase {
         }
     }
 
+    @NotNull
     private final Object SAVE_LOCK = new Object();
 
     public boolean save() throws IOException {
@@ -188,7 +193,7 @@ public class SoulDatabase {
         return fadedSouls;
     }
 
-    public int addSoul(@Nullable UUID owner, @NotNull UUID world, double x, double y, double z, ItemStack[] contents, int xp) {
+    public int addSoul(@Nullable UUID owner, @NotNull UUID world, double x, double y, double z, @NotNull ItemStack[] contents, int xp) {
         final Soul soul = new Soul(owner, world, x, y, z, System.currentTimeMillis(), contents, xp);
         int soulId = -1;
         synchronized (soulsById) {
@@ -215,6 +220,7 @@ public class SoulDatabase {
                 }
             });
         } else {
+            LOG.log(Level.INFO, "Saving synchronously");
             try {
                 save();
             } catch (IOException e) {
@@ -225,7 +231,7 @@ public class SoulDatabase {
         return soulId;
     }
 
-    public void freeSoul(CommandSender sender, int soulId, long soulFreeAfterMs) {
+    public void freeSoul(@NotNull CommandSender sender, int soulId, long soulFreeAfterMs) {
         Soul soul;
         if (soulId < 0) {
             soul = null;
@@ -261,7 +267,7 @@ public class SoulDatabase {
         }
     }
 
-    public void removeSoul(Soul toRemove) {
+    public void removeSoul(@NotNull Soul toRemove) {
         synchronized (soulsById) {
             final int i = soulsById.indexOf(toRemove);
             if (i == -1) {
@@ -276,7 +282,7 @@ public class SoulDatabase {
         }
     }
 
-    public void findSouls(@NotNull World world, int x, int z, int radius, Collection<Soul> out) {
+    public void findSouls(@NotNull World world, int x, int z, int radius, @NotNull Collection<Soul> out) {
         souls.query((x - radius) / SOUL_STORE_SCALE, (x + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE,
                 (z - radius) / SOUL_STORE_SCALE, (z + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE, out);
         final UUID worldUID = world.getUID();
@@ -288,6 +294,7 @@ public class SoulDatabase {
 
         @Nullable
         UUID owner;
+        @NotNull
         final UUID locationWorld;
         final double locationX, locationY, locationZ;
         final long timestamp;
@@ -309,7 +316,7 @@ public class SoulDatabase {
         }
 
         @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-        public boolean isAccessibleBy(OfflinePlayer player, long now, long soulFreeAfterMs) {
+        public boolean isAccessibleBy(@NotNull OfflinePlayer player, long now, long soulFreeAfterMs) {
             final UUID owner = this.owner;
             if (owner != null && !owner.equals(player.getUniqueId())) {
                 // Soul of somebody else, not accessible unless expired
@@ -345,6 +352,7 @@ public class SoulDatabase {
             return NumberConversions.floor(locationZ) / SOUL_STORE_SCALE;
         }
 
+        @Nullable
         private transient Location locationCache = null;
 
         @Nullable
@@ -406,7 +414,7 @@ public class SoulDatabase {
         }
     }
 
-    static boolean serializeSoul(Soul soul, DataOutputChannel out) {
+    static boolean serializeSoul(@NotNull Soul soul, @NotNull DataOutputChannel out) {
         try {
             serializeUUID(soul.locationWorld, out);
             out.writeDouble(soul.locationX);
@@ -433,7 +441,7 @@ public class SoulDatabase {
                         serializeObject(entry.getValue(), out);
                     }
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "Failed to serialize item "+item);
+                    LOG.log(Level.SEVERE, "Failed to serialize item "+item, e);
                     out.position(itemPosition);
                     failed++;
                 }
@@ -454,7 +462,7 @@ public class SoulDatabase {
     }
 
     @NotNull
-    static Soul deserializeSoul(DataInput in, int version) throws IOException, Serialization.Exception {
+    static Soul deserializeSoul(@NotNull DataInput in, int version) throws IOException, Serialization.Exception {
         final UUID worldUUID = deserializeUUID(in);
         final double locationX = version == 0 ? in.readInt() : in.readDouble();
         final double locationY = version == 0 ? in.readInt() : in.readDouble();

@@ -15,15 +15,17 @@ import java.nio.channels.SeekableByteChannel;
  */
 public class DataOutputChannel implements DataOutput, Channel {
 
+    @NotNull
     private final SeekableByteChannel chn;
+    @NotNull
     private final ByteBuffer buffer;
 
-    public DataOutputChannel(SeekableByteChannel chn, int bufferSize) {
+    public DataOutputChannel(@NotNull SeekableByteChannel chn, int bufferSize) {
         this.chn = chn;
         buffer = ByteBuffer.allocate(bufferSize).order(ByteOrder.BIG_ENDIAN);
     }
 
-    public DataOutputChannel(SeekableByteChannel chn) {
+    public DataOutputChannel(@NotNull SeekableByteChannel chn) {
         this(chn, 4096);
     }
 

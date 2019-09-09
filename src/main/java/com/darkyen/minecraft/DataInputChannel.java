@@ -1,6 +1,8 @@
 package com.darkyen.minecraft;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.DataInput;
 import java.io.EOFException;
@@ -16,16 +18,18 @@ import java.nio.channels.SeekableByteChannel;
  */
 public class DataInputChannel implements DataInput, Channel {
 
+    @NotNull
     private final SeekableByteChannel chn;
+    @NotNull
     private final ByteBuffer buffer;
 
-    public DataInputChannel(SeekableByteChannel chn, int bufferSize) {
+    public DataInputChannel(@NotNull SeekableByteChannel chn, int bufferSize) {
         this.chn = chn;
         buffer = ByteBuffer.allocate(bufferSize).order(ByteOrder.BIG_ENDIAN);
         this.buffer.limit(0);
     }
 
-    public DataInputChannel(SeekableByteChannel chn) {
+    public DataInputChannel(@NotNull SeekableByteChannel chn) {
         this(chn, 4096);
     }
 
@@ -179,12 +183,15 @@ public class DataInputChannel implements DataInput, Channel {
         return buffer.getDouble();
     }
 
+    @Contract("-> fail")
     @Override
     public String readLine() throws UnsupportedOperationException {
         throw new UnsupportedOperationException("readLine is deprecated and not supported");
     }
 
+    @Nullable
     private byte[] byteArr;
+    @Nullable
     private char[] charArr;
 
     @NotNull
@@ -197,6 +204,8 @@ public class DataInputChannel implements DataInput, Channel {
         if (byteArr == null || byteArr.length < utfLen) {
             byteArr = this.byteArr = new byte[utfLen * 2];
             charArr = this.charArr = new char[utfLen * 2];
+        } else {
+            assert charArr != null;
         }
 
         int c, char2, char3;

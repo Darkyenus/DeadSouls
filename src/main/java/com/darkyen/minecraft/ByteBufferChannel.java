@@ -1,5 +1,7 @@
 package com.darkyen.minecraft;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 
@@ -8,6 +10,7 @@ import java.nio.channels.SeekableByteChannel;
  */
 public class ByteBufferChannel implements SeekableByteChannel {
 
+    @NotNull
     private final ByteBuffer buffer;
 
 
@@ -21,7 +24,7 @@ public class ByteBufferChannel implements SeekableByteChannel {
     }
 
     @Override
-    public int read(ByteBuffer dst) {
+    public int read(@NotNull ByteBuffer dst) {
         final int available = buffer.remaining();
         if (available == 0) {
             return -1;
@@ -41,7 +44,7 @@ public class ByteBufferChannel implements SeekableByteChannel {
     }
 
     @Override
-    public int write(ByteBuffer src) {
+    public int write(@NotNull ByteBuffer src) {
         final int toWrite = src.remaining();
         if (buffer.remaining() < toWrite) {
             // Expand
@@ -56,6 +59,7 @@ public class ByteBufferChannel implements SeekableByteChannel {
         return buffer.position();
     }
 
+    @NotNull
     @Override
     public ByteBufferChannel position(long newPosition) {
         buffer.position((int) newPosition);
@@ -67,6 +71,7 @@ public class ByteBufferChannel implements SeekableByteChannel {
         return buffer.limit();
     }
 
+    @NotNull
     @Override
     public ByteBufferChannel truncate(long size) {
         buffer.limit((int)size);

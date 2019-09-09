@@ -87,7 +87,7 @@ public class Util {
     }
 
     private static final Pattern TIME_SANITIZER = Pattern.compile("[^a-zA-Z0-9]");
-    public static long parseTimeMs(@Nullable String time, long defaultMs, Logger log) {
+    public static long parseTimeMs(@Nullable String time, long defaultMs, @NotNull Logger log) {
         if (time == null) {
             return defaultMs;
         }
@@ -208,7 +208,7 @@ public class Util {
         }
     }
 
-    public static int getTotalExperience(Player player) {
+    public static int getTotalExperience(@NotNull Player player) {
         // Can't use player.getTotalExperience(), because that does not properly handle XP added via "/xp add level",
         // and, most importantly, it does not factor in experience spent on enchanting.
         return getExperienceToReach(player.getLevel()) + Math.round(getExpToLevel(player.getLevel()) * player.getExp());

@@ -59,6 +59,7 @@ import static com.darkyen.minecraft.Util.set;
  */
 public class DeadSouls extends JavaPlugin implements Listener {
 
+    @Nullable
     private SoulDatabase soulDatabase;
     private long soulFreeAfterMs = Long.MAX_VALUE;
     private long soulFadesAfterMs = Long.MAX_VALUE;
@@ -66,34 +67,52 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private float retainedXPPercent;
     private int retainedXPPerLevel;
 
+    @NotNull
     private static final String DEFAULT_SOUND_SOUL_COLLECT_XP = "entity.experience_orb.pickup";
+    @NotNull
     private String soundSoulCollectXp = DEFAULT_SOUND_SOUL_COLLECT_XP;
+    @NotNull
     private static final String DEFAULT_SOUND_SOUL_COLLECT_ITEM = "item.trident.return";
+    @NotNull
     private String soundSoulCollectItem = DEFAULT_SOUND_SOUL_COLLECT_ITEM;
+    @NotNull
     private static final String DEFAULT_SOUND_SOUL_DEPLETED = "entity.generic.extinguish_fire";
+    @NotNull
     private String soundSoulDepleted = DEFAULT_SOUND_SOUL_DEPLETED;
+    @NotNull
     private static final String DEFAULT_SOUND_SOUL_CALLING = "block.beacon.ambient";
+    @NotNull
     private String soundSoulCalling = DEFAULT_SOUND_SOUL_CALLING;
     private static final float DEFAULT_VOLUME_SOUL_CALLING = 16f;
     private float volumeSoulCalling = DEFAULT_VOLUME_SOUL_CALLING;
+    @NotNull
     private static final String DEFAULT_SOUND_SOUL_DROPPED = "block.bell.resonate";
+    @NotNull
     private String soundSoulDropped = DEFAULT_SOUND_SOUL_DROPPED;
 
+    @NotNull
     private static final String DEFAULT_TEXT_FREE_MY_SOUL = "Free my soul";
+    @Nullable
     private String textFreeMySoul = DEFAULT_TEXT_FREE_MY_SOUL;
+    @NotNull
     private static final String DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP = "Allows other players to collect the soul immediately";
+    @Nullable
     private String textFreeMySoulTooltip = DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP;
 
     private boolean soulFreeingEnabled = true;
 
     private boolean smartSoulPlacement = true;
 
+    @NotNull
     private PvPBehavior pvpBehavior = PvPBehavior.NORMAL;
 
+    @NotNull
     private static final Color DEFAULT_SOUL_DUST_COLOR_ITEMS = Color.WHITE;
     private static final float DEFAULT_SOUL_DUST_SIZE_ITEMS = 2f;
+    @NotNull
     private static final Color DEFAULT_SOUL_DUST_COLOR_XP = Color.AQUA;
     private static final float DEFAULT_SOUL_DUST_SIZE_XP = 2f;
+    @NotNull
     private static final Color DEFAULT_SOUL_DUST_COLOR_GONE = Color.YELLOW;
     private static final float DEFAULT_SOUL_DUST_SIZE_GONE = 3f;
     @NotNull
@@ -103,19 +122,30 @@ public class DeadSouls extends JavaPlugin implements Listener {
     @NotNull
     private Particle.DustOptions soulDustOptionsGone = new Particle.DustOptions(DEFAULT_SOUL_DUST_COLOR_GONE, DEFAULT_SOUL_DUST_SIZE_GONE);
 
+    @NotNull
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
     private boolean soulDatabaseChanged = false;
 
     private static final double COLLECTION_DISTANCE2 = NumberConversions.square(1);
 
+    @NotNull
     private static final ItemStack[] NO_ITEM_STACKS = new ItemStack[0];
+    @NotNull
     private final ComparatorSoulDistanceTo processPlayers_comparatorDistanceTo = new ComparatorSoulDistanceTo();
+    @NotNull
     private final Location processPlayers_playerLocation = new Location(null, 0, 0, 0);
+    @NotNull
     private final Random processPlayers_random = new Random();
 
     private long processPlayers_nextFadeCheck = 0;
 
     private void processPlayers() {
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            getLogger().log(Level.WARNING, "processPlayers: soulDatabase not loaded yet");
+            return;
+        }
+
         final long now = System.currentTimeMillis();
 
         if (now > processPlayers_nextFadeCheck && soulFadesAfterMs < Long.MAX_VALUE) {
@@ -406,12 +436,14 @@ public class DeadSouls extends JavaPlugin implements Listener {
         getServer().getScheduler().runTaskTimer(this, this::processPlayers, 20, 20);
 
         // DEVELOPMENT ONLY
-        if (true) {
-            try {
-                developmentStressTest();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+        if (false) {
+            getServer().getScheduler().runTaskAsynchronously(this, () -> {
+                try {
+                    developmentStressTest();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
         }
     }
 
@@ -472,6 +504,12 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            getLogger().log(Level.WARNING, "processPlayers: soulDatabase not loaded yet");
+            return false;
+        }
+
         if ("dead_souls_free_soul".equals(command.getName()) && args.length == 1) {
             if (!soulFreeingEnabled) {
                 return true;
@@ -503,6 +541,12 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         final boolean pvp = player.getKiller() != null && !player.equals(player.getKiller());
         if (pvp && pvpBehavior == PvPBehavior.DISABLED) {
+            return;
+        }
+
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            getLogger().log(Level.WARNING, "processPlayers: soulDatabase not loaded yet");
             return;
         }
 
@@ -627,7 +671,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         final ArrayList<SoulDatabase.Soul> visibleSouls = new ArrayList<>();
 
         @NotNull
-        Location findSafeSoulSpawnLocation(Player player) {
+        Location findSafeSoulSpawnLocation(@NotNull Player player) {
             final Location playerLocation = player.getLocation();
             if (isNear(lastSafeLocation, playerLocation, 20)) {
                 set(playerLocation, lastSafeLocation);
@@ -682,7 +726,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         double toX, toY, toZ;
 
-        private double distanceTo(SoulDatabase.Soul s) {
+        private double distanceTo(@NotNull SoulDatabase.Soul s) {
             final double x = toX - s.locationX;
             final double y = toY - s.locationY;
             final double z = toZ - s.locationZ;
@@ -690,7 +734,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         }
 
         @Override
-        public int compare(SoulDatabase.Soul o1, SoulDatabase.Soul o2) {
+        public int compare(@NotNull SoulDatabase.Soul o1, @NotNull SoulDatabase.Soul o2) {
             return Double.compare(distanceTo(o1), distanceTo(o2));
         }
     }

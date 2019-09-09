@@ -2,6 +2,8 @@ package com.darkyen.minecraft;
 
 import org.bukkit.configuration.serialization.ConfigurationSerializable;
 import org.bukkit.configuration.serialization.ConfigurationSerialization;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -22,7 +24,7 @@ public class Serialization {
 
     private static final Logger LOG = Logger.getLogger("DeadSouls-Serialization");
 
-    public static void serializeObject(Object object, DataOutput out) throws IOException, Exception {
+    public static void serializeObject(@Nullable Object object, @NotNull DataOutput out) throws IOException, Exception {
         if (object == null) {
             out.writeByte(SerializedType.NULL.ordinal());
         } else if (object instanceof Boolean) {
@@ -101,7 +103,8 @@ public class Serialization {
         }
     }
 
-    public static Object deserializeObject(DataInput in) throws IOException, Exception {
+    @Nullable
+    public static Object deserializeObject(@NotNull DataInput in) throws IOException, Exception {
         final int typeByte = in.readUnsignedByte();
         if (typeByte > SerializedType.VALUES.length) {
             throw new Exception("Unknown type: "+typeByte);
@@ -190,14 +193,16 @@ public class Serialization {
         }
     }
 
+    @NotNull
     public static final UUID ZERO_UUID = new UUID(0L, 0L);
 
-    public static void serializeUUID(UUID uuid, DataOutput out) throws IOException {
+    public static void serializeUUID(@NotNull UUID uuid, @NotNull DataOutput out) throws IOException {
         out.writeLong(uuid.getMostSignificantBits());
         out.writeLong(uuid.getLeastSignificantBits());
     }
 
-    public static UUID deserializeUUID(DataInput in) throws IOException {
+    @NotNull
+    public static UUID deserializeUUID(@NotNull DataInput in) throws IOException {
         final long most = in.readLong();
         final long least = in.readLong();
         if (most == 0L && least == 0L) {
@@ -232,11 +237,11 @@ public class Serialization {
     }
 
     public static final class Exception extends java.lang.Exception {
-        Exception(String message) {
+        Exception(@NotNull String message) {
             super(message);
         }
 
-        Exception(String message, Throwable cause) {
+        Exception(@NotNull String message, @NotNull Throwable cause) {
             super(message, cause);
         }
     }
