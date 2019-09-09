@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -47,23 +48,35 @@ public class SoulDatabase {
     private static final Logger LOG = Logger.getLogger("DeadSouls-ItemStore");
 
     static final int CURRENT_DB_VERSION = 1;
-
-    @NotNull
-    private final Plugin owner;
     private static final int SOUL_STORE_SCALE = 16;
+
+    @Nullable
+    private final Plugin owner;
     private final SpatialDatabase<@NotNull Soul> souls = new SpatialDatabase<>();
     private final ArrayList<@Nullable Soul> soulsById = new ArrayList<>();
     @NotNull
     private final Path databaseFile;
 
-    public SoulDatabase(@NotNull Plugin owner, @NotNull Path databaseFile) throws IOException, Serialization.Exception {
-        this.owner = owner;
-        this.databaseFile = databaseFile;
+	public SoulDatabase(@Nullable Plugin owner, @NotNull Path databaseFile) {
+		this.owner = owner;
+		this.databaseFile = databaseFile;
 
-        load(databaseFile);
+		try {
+			for (Soul soul : load(databaseFile)) {
+				soulsById.add(soul);
+				souls.insert(soul);
+			}
+		} catch (Exception e) {
+			LOG.log(Level.SEVERE, "Failed to load legacy soul database, old souls will not be present", e);
+		}
+	}
+
+    public List<@Nullable Soul> getSoulsById() {
+	    return soulsById;
     }
 
-    public void load(Path databaseFile) throws IOException, Serialization.Exception {
+    public static List<Soul> load(Path databaseFile) throws IOException, Serialization.Exception {
+        final ArrayList<Soul> result = new ArrayList<>();
         try (DataInputChannel in = new DataInputChannel(Files.newByteChannel(databaseFile, StandardOpenOption.READ))) {
             final int version = in.readInt();
             if (version > CURRENT_DB_VERSION || version < 0) {
@@ -72,13 +85,13 @@ public class SoulDatabase {
             int soulCount = 0;
             while (in.hasRemaining()) {
                 final Soul soul = deserializeSoul(in, version);
-                soulsById.add(soul);
-                souls.insert(soul);
+                result.add(soul);
                 soulCount++;
             }
 
             LOG.log(Level.INFO, "Soul database loaded ("+soulCount+" souls, db version "+version+")");
         } catch (NoSuchFileException ignored) {}
+        return result;
     }
 
     public void loadLegacy(Path databaseFile) throws IOException, Serialization.Exception {
@@ -193,13 +206,21 @@ public class SoulDatabase {
             }
         }
         souls.insert(soul);
-        Bukkit.getScheduler().runTaskAsynchronously(this.owner, () -> {
+        if (this.owner != null) {
+            Bukkit.getScheduler().runTaskAsynchronously(this.owner, () -> {
+                try {
+                    save();
+                } catch (IOException e) {
+                    LOG.log(Level.WARNING, "Failed to save ItemStore asynchronously", e);
+                }
+            });
+        } else {
             try {
                 save();
             } catch (IOException e) {
-                LOG.log(Level.WARNING, "Failed to save ItemStore asynchronously", e);
+                LOG.log(Level.WARNING, "Failed to save ItemStore synchronously", e);
             }
-        });
+        }
 
         return soulId;
     }
@@ -347,6 +368,42 @@ public class SoulDatabase {
             this.locationCache = locationCache;
             return locationCache;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            Soul soul = (Soul) o;
+
+            if (Double.compare(soul.locationX, locationX) != 0) return false;
+            if (Double.compare(soul.locationY, locationY) != 0) return false;
+            if (Double.compare(soul.locationZ, locationZ) != 0) return false;
+            if (timestamp != soul.timestamp) return false;
+            if (xp != soul.xp) return false;
+            if (owner != null ? !owner.equals(soul.owner) : soul.owner != null) return false;
+            if (!locationWorld.equals(soul.locationWorld)) return false;
+            // Probably incorrect - comparing Object[] arrays with Arrays.equals
+            return Arrays.equals(items, soul.items);
+        }
+
+        @Override
+        public int hashCode() {
+            int result;
+            long temp;
+            result = owner != null ? owner.hashCode() : 0;
+            result = 31 * result + locationWorld.hashCode();
+            temp = Double.doubleToLongBits(locationX);
+            result = 31 * result + (int) (temp ^ (temp >>> 32));
+            temp = Double.doubleToLongBits(locationY);
+            result = 31 * result + (int) (temp ^ (temp >>> 32));
+            temp = Double.doubleToLongBits(locationZ);
+            result = 31 * result + (int) (temp ^ (temp >>> 32));
+            result = 31 * result + (int) (timestamp ^ (timestamp >>> 32));
+            result = 31 * result + Arrays.hashCode(items);
+            result = 31 * result + xp;
+            return result;
+        }
     }
 
     static boolean serializeSoul(Soul soul, DataOutputChannel out) {
@@ -406,10 +463,16 @@ public class SoulDatabase {
         final long timestamp = in.readLong();
         final int xp = in.readInt();
 
-        final int itemAmount = in.readShort() & 0xFFFF;
+        final int itemAmount = in.readUnsignedShort();
+        if (itemAmount > 100) {
+            LOG.log(Level.WARNING, "Suspiciously high amount of items in the soul: "+itemAmount);
+        }
         final ItemStack[] items = new ItemStack[itemAmount];
         for (int i = 0; i < itemAmount; i++) {
-            final int entries = in.readShort() & 0xFFFF;
+            final int entries = in.readUnsignedShort();
+            if (entries > 100) {
+                LOG.log(Level.WARNING, "Suspiciously high amount of entries in the soul: "+entries);
+            }
             final HashMap<String, Object> itemMap = new HashMap<>(entries + entries / 2);
             for (int entryId = 0; entryId < entries; entryId++) {
                 final String key = in.readUTF();

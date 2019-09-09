@@ -17,6 +17,7 @@ import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -25,13 +26,17 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -377,18 +382,21 @@ public class DeadSouls extends JavaPlugin implements Listener {
             }
         }
 
-        try {
+        {
             final Path dataFolder = getDataFolder().toPath();
             final Path soulDb = dataFolder.resolve("soul-db.bin");
             soulDatabase = new SoulDatabase(this, soulDb);
 
             final Path legacySoulDb = dataFolder.resolve("souldb.bin");
             if (Files.exists(legacySoulDb)) {
-                soulDatabase.loadLegacy(legacySoulDb);
+                try {
+                    soulDatabase.loadLegacy(legacySoulDb);
+                } catch (Exception e) {
+                    getLogger().log(Level.SEVERE, "Failed to load legacy soul database, old souls will not be present", e);
+                }
             }
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to load soul database", e);
         }
+
         soulDatabaseChanged = true;
 
         for (Player onlinePlayer : getServer().getOnlinePlayers()) {
@@ -396,6 +404,51 @@ public class DeadSouls extends JavaPlugin implements Listener {
         }
 
         getServer().getScheduler().runTaskTimer(this, this::processPlayers, 20, 20);
+
+        // DEVELOPMENT ONLY
+        if (true) {
+            try {
+                developmentStressTest();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static void developmentStressTest() throws IOException, Serialization.Exception {
+        final Path temporaryDatabaseFile = Paths.get("testingdb.bin").toAbsolutePath();
+        final SoulDatabase soulDatabase = new SoulDatabase(null, temporaryDatabaseFile);
+        final Random random = new Random();
+
+        for (int iteration = 0; iteration < 200; iteration++) {
+            final ItemStack[] itemStacks = new ItemStack[random.nextInt(100)];
+            for (int item = 0; item < itemStacks.length; item++) {
+                itemStacks[item] = new ItemStack(Material.DIAMOND_SWORD, 1);
+                itemStacks[item].addEnchantment(Enchantment.DAMAGE_ALL, 3);
+                final ItemMeta itemMeta = itemStacks[item].getItemMeta();
+                assert itemMeta != null;
+                itemMeta.setDisplayName("BLAH"+item);
+                itemMeta.setUnbreakable(true);
+                itemStacks[item].setItemMeta(itemMeta);
+            }
+            soulDatabase.addSoul(UUID.randomUUID(), UUID.randomUUID(), random.nextDouble(), random.nextDouble(), random.nextDouble(), itemStacks, random.nextInt(100000));
+
+            final List<SoulDatabase.Soul> loaded = SoulDatabase.load(temporaryDatabaseFile);
+            final List<SoulDatabase.@Nullable Soul> expected = soulDatabase.getSoulsById();
+
+            if (loaded.size() != expected.size()) {
+                throw new AssertionError(loaded + " " +expected);
+            }
+
+            for (int i = 0; i < loaded.size(); i++) {
+                final SoulDatabase.Soul loadedSoul = loaded.get(i);
+                final SoulDatabase.Soul expectedSoul = expected.get(i);
+
+                if (!expectedSoul.equals(loadedSoul)) {
+                    throw new AssertionError(loadedSoul + " " +expectedSoul);
+                }
+            }
+        }
     }
 
     @Override
@@ -453,6 +506,11 @@ public class DeadSouls extends JavaPlugin implements Listener {
             return;
         }
 
+        // Actually clearing the drops is deferred to the end of the method:
+        // in case of any bug that causes this method to crash, we don't want to just delete the items
+        boolean clearItemDrops = false;
+        boolean clearXPDrops = false;
+
         final ItemStack[] soulItems;
         if (event.getKeepInventory() || !player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul.items")) {
             // We don't modify drops for this death at all
@@ -460,7 +518,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         } else {
             final List<ItemStack> drops = event.getDrops();
             soulItems = drops.toArray(NO_ITEM_STACKS);
-            drops.clear();
+            clearItemDrops = true;
         }
 
         int soulXp;
@@ -475,10 +533,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 soulXp = retainedXPPerLevel * player.getLevel();
             }
             soulXp = Util.clamp(soulXp, 0, totalExperience);
-            event.setNewExp(0);
-            event.setNewLevel(0);
-            event.setNewTotalExp(0);
-            event.setDroppedExp(0);
+            clearXPDrops = true;
         }
 
         if (soulXp == 0 && soulItems.length == 0) {
@@ -486,7 +541,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             return;
         }
 
-        Location soulLocation;
+        Location soulLocation = null;
         try {
             if (smartSoulPlacement) {
                 PlayerSoulInfo info = watchedPlayers.get(player);
@@ -503,6 +558,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
         } catch (Exception bugException) {
             // Should never happen, but just in case!
             getLogger().log(Level.SEVERE, "Failed to find soul location, defaulting to player location!", bugException);
+        }
+        if (soulLocation == null) {
             soulLocation = player.getLocation();
         }
 
@@ -536,6 +593,16 @@ public class DeadSouls extends JavaPlugin implements Listener {
         if (!soundSoulDropped.isEmpty()) {
             player.getWorld().playSound(soulLocation, soundSoulDropped, SoundCategory.MASTER, 1.1f, 1.7f);
         }
+
+        if (clearItemDrops) {
+            event.getDrops().clear();
+        }
+        if (clearXPDrops) {
+            event.setNewExp(0);
+            event.setNewLevel(0);
+            event.setNewTotalExp(0);
+            event.setDroppedExp(0);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -559,6 +626,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         final ArrayList<SoulDatabase.Soul> visibleSouls = new ArrayList<>();
 
+        @NotNull
         Location findSafeSoulSpawnLocation(Player player) {
             final Location playerLocation = player.getLocation();
             if (isNear(lastSafeLocation, playerLocation, 20)) {
@@ -571,7 +639,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
             return findFallbackSoulSpawnLocation(player, playerLocation, true);
         }
 
-        static Location findFallbackSoulSpawnLocation(Player player, Location playerLocation, boolean improve) {
+        @NotNull
+        static Location findFallbackSoulSpawnLocation(@NotNull Player player, @NotNull Location playerLocation, boolean improve) {
             final World world = player.getWorld();
 
             final int x = playerLocation.getBlockX();

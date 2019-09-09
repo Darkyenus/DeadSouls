@@ -102,7 +102,7 @@ public class Serialization {
     }
 
     public static Object deserializeObject(DataInput in) throws IOException, Exception {
-        final int typeByte = in.readByte() & 0xFF;
+        final int typeByte = in.readUnsignedByte();
         if (typeByte > SerializedType.VALUES.length) {
             throw new Exception("Unknown type: "+typeByte);
         }
@@ -132,7 +132,7 @@ public class Serialization {
                 return in.readUTF();
             case LIST_BYTE:
             case LIST: {
-                final int length = type == SerializedType.LIST_BYTE ? (in.readByte() & 0xFF) : in.readInt();
+                final int length = type == SerializedType.LIST_BYTE ? in.readUnsignedByte() : in.readInt();
                 if (length == 0)
                     return Collections.emptyList();
                 final ArrayList<Object> list = new ArrayList<>(length);
@@ -143,7 +143,7 @@ public class Serialization {
             }
             case MAP_BYTE:
             case MAP: {
-                final int length = type == SerializedType.MAP_BYTE ? (in.readByte() & 0xFF) : in.readInt();
+                final int length = type == SerializedType.MAP_BYTE ? in.readUnsignedByte() : in.readInt();
                 if (length == 0)
                     return Collections.emptyMap();
                 final HashMap<String, Object> map = new HashMap<>(length + length/2);
@@ -156,8 +156,7 @@ public class Serialization {
             }
             case CONFIGURATION_SERIALIZABLE_BYTE:
             case CONFIGURATION_SERIALIZABLE: {
-                final int size = type == SerializedType.CONFIGURATION_SERIALIZABLE_BYTE ?
-                        (in.readByte() & 0xFF) : in.readInt();
+                final int size = type == SerializedType.CONFIGURATION_SERIALIZABLE_BYTE ? in.readUnsignedByte() : in.readInt();
                 final String alias = in.readUTF();
                 final HashMap<String, Object> map = new HashMap<>(size + size / 2);
                 for (int i = 0; i < size; i++) {
@@ -207,7 +206,7 @@ public class Serialization {
         return new UUID(most, least);
     }
 
-    private enum SerializedType {
+    enum SerializedType {
         NULL,
         PRIMITIVE_BOOLEAN_TRUE,
         PRIMITIVE_BOOLEAN_FALSE,

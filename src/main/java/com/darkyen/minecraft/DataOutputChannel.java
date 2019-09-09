@@ -170,7 +170,7 @@ public class DataOutputChannel implements DataOutput, Channel {
             throw new UTFDataFormatException("encoded string too long: " + utfLength + " bytes");
 
         final ByteBuffer buffer = this.buffer;
-        if (this.buffer.capacity() < 2 + utfLength) {
+        if (this.buffer.capacity() >= 2 + utfLength) {
             // Fast path
             require(2 + utfLength);
             buffer.putShort((short)utfLength);
