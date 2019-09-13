@@ -11,13 +11,13 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.Server;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -26,17 +26,15 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -390,7 +388,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         saveDefaultConfig();
 
-        getServer().getPluginManager().registerEvents(this, this);
+        final Server server = getServer();
+        server.getPluginManager().registerEvents(this, this);
 
         // Run included tests
         for (String testClassName : new String[]{"com.darkyen.minecraft.ItemStoreTest"}) {
@@ -403,8 +402,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 }
                 getLogger().info("Found test class: " + testClassName);
 
-                final Method runLiveTest = testClass.getMethod("runLiveTest");
-                runLiveTest.invoke(null);
+                final Method runLiveTest = testClass.getMethod("runLiveTest", Plugin.class);
+                runLiveTest.invoke(null, this);
 
                 getLogger().info("Test successful");
             } catch (Exception e) {
@@ -429,58 +428,11 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         soulDatabaseChanged = true;
 
-        for (Player onlinePlayer : getServer().getOnlinePlayers()) {
+        for (Player onlinePlayer : server.getOnlinePlayers()) {
             watchedPlayers.put(onlinePlayer, new PlayerSoulInfo());
         }
 
-        getServer().getScheduler().runTaskTimer(this, this::processPlayers, 20, 20);
-
-        // DEVELOPMENT ONLY
-        if (false) {
-            getServer().getScheduler().runTaskAsynchronously(this, () -> {
-                try {
-                    developmentStressTest();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
-        }
-    }
-
-    private static void developmentStressTest() throws IOException, Serialization.Exception {
-        final Path temporaryDatabaseFile = Paths.get("testingdb.bin").toAbsolutePath();
-        final SoulDatabase soulDatabase = new SoulDatabase(null, temporaryDatabaseFile);
-        final Random random = new Random();
-
-        for (int iteration = 0; iteration < 200; iteration++) {
-            final ItemStack[] itemStacks = new ItemStack[random.nextInt(100)];
-            for (int item = 0; item < itemStacks.length; item++) {
-                itemStacks[item] = new ItemStack(Material.DIAMOND_SWORD, 1);
-                itemStacks[item].addEnchantment(Enchantment.DAMAGE_ALL, 3);
-                final ItemMeta itemMeta = itemStacks[item].getItemMeta();
-                assert itemMeta != null;
-                itemMeta.setDisplayName("BLAH"+item);
-                itemMeta.setUnbreakable(true);
-                itemStacks[item].setItemMeta(itemMeta);
-            }
-            soulDatabase.addSoul(UUID.randomUUID(), UUID.randomUUID(), random.nextDouble(), random.nextDouble(), random.nextDouble(), itemStacks, random.nextInt(100000));
-
-            final List<SoulDatabase.Soul> loaded = SoulDatabase.load(temporaryDatabaseFile);
-            final List<SoulDatabase.@Nullable Soul> expected = soulDatabase.getSoulsById();
-
-            if (loaded.size() != expected.size()) {
-                throw new AssertionError(loaded + " " +expected);
-            }
-
-            for (int i = 0; i < loaded.size(); i++) {
-                final SoulDatabase.Soul loadedSoul = loaded.get(i);
-                final SoulDatabase.Soul expectedSoul = expected.get(i);
-
-                if (!expectedSoul.equals(loadedSoul)) {
-                    throw new AssertionError(loadedSoul + " " +expectedSoul);
-                }
-            }
-        }
+        server.getScheduler().runTaskTimer(this, this::processPlayers, 20, 20);
     }
 
     @Override

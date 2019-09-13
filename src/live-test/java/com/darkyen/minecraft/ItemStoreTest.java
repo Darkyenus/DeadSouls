@@ -1,7 +1,6 @@
 package com.darkyen.minecraft;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
@@ -9,17 +8,27 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
+import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  */
 class ItemStoreTest {
 
+    private static final Logger LOG = Logger.getLogger(ItemStoreTest.class.getName());
     private static final Random random = new Random();
 
     private static void testSerialization(ItemStack item) throws Exception {
@@ -51,7 +60,44 @@ class ItemStoreTest {
         Assertions.assertArrayEquals(soul.items, soulFromHell.items);
     }
 
-    public static void runLiveTest() throws Exception {
+    private static void savingTest() throws IOException, Serialization.Exception {
+        final Path temporaryDatabaseFile = Paths.get("testingdb.bin").toAbsolutePath();
+        final SoulDatabase soulDatabase = new SoulDatabase(null, temporaryDatabaseFile);
+        final Random random = new Random();
+
+        for (int iteration = 0; iteration < 200; iteration++) {
+            final ItemStack[] itemStacks = new ItemStack[random.nextInt(100)];
+            for (int item = 0; item < itemStacks.length; item++) {
+                itemStacks[item] = new ItemStack(Material.DIAMOND_SWORD, 1);
+                itemStacks[item].addEnchantment(Enchantment.DAMAGE_ALL, 3);
+                final ItemMeta itemMeta = itemStacks[item].getItemMeta();
+                assert itemMeta != null;
+                itemMeta.setDisplayName("BLAH"+item);
+                itemMeta.setUnbreakable(true);
+                itemStacks[item].setItemMeta(itemMeta);
+            }
+            soulDatabase.addSoul(UUID.randomUUID(), UUID.randomUUID(), random.nextDouble(), random.nextDouble(), random.nextDouble(), itemStacks, random.nextInt(100000));
+
+            final List<SoulDatabase.Soul> loaded = SoulDatabase.load(temporaryDatabaseFile);
+            final List<SoulDatabase.@Nullable Soul> expected = soulDatabase.getSoulsById();
+
+            if (loaded.size() != expected.size()) {
+                throw new AssertionError(loaded + " " +expected);
+            }
+
+            for (int i = 0; i < loaded.size(); i++) {
+                final SoulDatabase.Soul loadedSoul = loaded.get(i);
+                final SoulDatabase.Soul expectedSoul = expected.get(i);
+
+                if (!expectedSoul.equals(loadedSoul)) {
+                    throw new AssertionError(loadedSoul + " " +expectedSoul);
+                }
+            }
+        }
+        Files.delete(temporaryDatabaseFile);
+    }
+
+    public static void runLiveTest(Plugin plugin) throws Exception {
         for (Material value : Material.values()) {
             if (!value.isItem() || value.getMaxStackSize() <= 0) {
                 continue;
@@ -102,9 +148,26 @@ class ItemStoreTest {
                 item.setItemMeta(meta);
             }
 
-            testSerialization(item);
+            try {
+                testSerialization(item);
+            } catch (Throwable t) {
+                System.out.println("Failed: "+item.getType());
+                t.printStackTrace();
+            }
         }
 
+        try {
+            savingTest();
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Development test failed (sync)", e);
+        }
 
+        Bukkit.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                savingTest();
+            } catch (Exception e) {
+                LOG.log(Level.WARNING, "Development test failed (async)", e);
+            }
+        });
     }
 }

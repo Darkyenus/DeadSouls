@@ -355,7 +355,7 @@ public final class DataChannelTest {
             }
             case LIST_BYTE:
             case LIST: {
-                final int length = type == LIST_BYTE ? random.nextInt(256) : 256 + random.nextInt(500);
+                final int length = type == LIST_BYTE ? random.nextInt(256) : 256 + random.nextInt(10);
                 final ArrayList<Object> resultList = new ArrayList<>(length);
                 for (int i = 0; i < length; i++) {
                     resultList.add(generateObject(branchChance * 0.3f));
@@ -364,7 +364,7 @@ public final class DataChannelTest {
             }
             case MAP_BYTE:
             case MAP: {
-                final int length = type == MAP_BYTE ? random.nextInt(256) : 256 + random.nextInt(500);
+                final int length = type == MAP_BYTE ? random.nextInt(256) : 256 + random.nextInt(10);
                 final HashMap<String, Object> resultMap = new HashMap<>();
                 for (int i = 0; i < length; i++) {
                     resultMap.put("KEY:"+i, generateObject(branchChance * 0.3f));
@@ -373,7 +373,7 @@ public final class DataChannelTest {
             }
             case CONFIGURATION_SERIALIZABLE_BYTE:
             case CONFIGURATION_SERIALIZABLE: {
-                final int length = type == CONFIGURATION_SERIALIZABLE_BYTE ? random.nextInt(256) : 256 + random.nextInt(500);
+                final int length = type == CONFIGURATION_SERIALIZABLE_BYTE ? random.nextInt(256) : 256 + random.nextInt(10);
                 final HashMap<String, Object> resultMap = new HashMap<>();
                 for (int i = 0; i < length; i++) {
                     resultMap.put("KEY:"+i, generateObject(branchChance * 0.3f));
@@ -428,24 +428,32 @@ public final class DataChannelTest {
 
     @Test
     void objectStressTest() throws IOException, Serialization.Exception {
-        final int capacity = 1 << 25;
+        final int capacity = 1 << 27;
         final ByteBufferChannel byteChn = new ByteBufferChannel(capacity);
         final ArrayList<Object> objects = new ArrayList<>();
 
         try (DataOutputChannel out = new DataOutputChannel(byteChn)){
             long maxObjectSize = 0;
+            int removed = 0;
             while (out.position() + maxObjectSize * 2 < capacity) {
-                final Object o = generateObject(0.5f);
+                final Object o = generateObject(0.3f);
                 objects.add(o);
                 final long posBefore = out.position();
                 Serialization.serializeObject(o, out);
                 final long objectSize = out.position() - posBefore;
                 if (objectSize > maxObjectSize) {
                     maxObjectSize = objectSize;
-                    System.out.println("New max object size: "+objectSize);
+                    //System.out.println("New max object size: "+objectSize);
+                }
+
+                if (random.nextInt(5) == 0) {
+                    out.position(posBefore);
+                    out.truncate();
+                    objects.remove(objects.size() - 1);
+                    removed++;
                 }
             }
-            System.out.println("Generated "+objects.size()+" objects, total size "+out.position());
+            System.out.println("Generated "+objects.size()+" objects, total size "+out.position()+", removed "+ removed);
         }
 
 
@@ -457,6 +465,7 @@ public final class DataChannelTest {
 
                 assertDeepEquals(expected, received, "");
             }
+            assertFalse(in.hasRemaining());
         }
     }
 

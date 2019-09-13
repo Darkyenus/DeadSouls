@@ -34,14 +34,16 @@ public class DataOutputChannel implements DataOutput, Channel {
     }
 
     public void position(long newPosition) throws IOException {
-        final long currentBasePosition = chn.position();
-        final long positionRelativeToBuffer = newPosition - currentBasePosition;
-        if (positionRelativeToBuffer >= 0 && positionRelativeToBuffer < buffer.limit()) {
-            buffer.position((int) positionRelativeToBuffer);
-        } else {
+        if (newPosition != position()) {
             flush();
             chn.position(newPosition);
         }
+    }
+
+    /** Truncate to the current position */
+    public void truncate() throws IOException {
+        flush();
+        chn.truncate(chn.position());
     }
 
     private void require(int bytes) throws IOException {

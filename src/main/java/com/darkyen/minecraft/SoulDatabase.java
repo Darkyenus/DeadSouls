@@ -441,8 +441,9 @@ public class SoulDatabase {
                         serializeObject(entry.getValue(), out);
                     }
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "Failed to serialize item "+item, e);
+                    LOG.log(Level.SEVERE, "Failed to serialize item: "+Util.safeToString(item), e);
                     out.position(itemPosition);
+                    out.truncate();
                     failed++;
                 }
             }

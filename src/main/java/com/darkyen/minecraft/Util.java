@@ -4,6 +4,7 @@ import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -212,5 +213,16 @@ public class Util {
         // Can't use player.getTotalExperience(), because that does not properly handle XP added via "/xp add level",
         // and, most importantly, it does not factor in experience spent on enchanting.
         return getExperienceToReach(player.getLevel()) + Math.round(getExpToLevel(player.getLevel()) * player.getExp());
+    }
+
+    public static String safeToString(ItemStack item) {
+        if (item == null) {
+            return "null";
+        }
+        try {
+            return item.toString();
+        } catch (Exception e) {
+            return "ItemStack{" + item.getType().name() + " x " + item.getAmount() + ", [broken meta]}";
+        }
     }
 }
