@@ -73,9 +73,38 @@ public class SoulDatabase {
 		}
 	}
 
+    /** NOTE: Synchronize on the collection before accessing */
     @NotNull
     public List<@Nullable Soul> getSoulsById() {
 	    return soulsById;
+    }
+
+    public static final class SoulAndId {
+        public final int id;
+        public final Soul soul;
+
+        public SoulAndId(int id, Soul soul) {
+            this.id = id;
+            this.soul = soul;
+        }
+    }
+
+    public List<@NotNull SoulAndId> getSoulsByOwnerAndWorld(@Nullable UUID owner, @Nullable UUID world) {
+        final ArrayList<SoulAndId> result = new ArrayList<>();
+        synchronized (soulsById) {
+            final ArrayList<@Nullable Soul> soulsById = this.soulsById;
+            for (int i = 0; i < soulsById.size(); i++) {
+                Soul soul = soulsById.get(i);
+                if (soul == null) {
+                    continue;
+                }
+                if ((owner == null || owner.equals(soul.owner)) && (world == null || world
+                        .equals(soul.locationWorld))) {
+                    result.add(new SoulAndId(i, soul));
+                }
+            }
+        }
+        return result;
     }
 
     @NotNull
@@ -231,19 +260,21 @@ public class SoulDatabase {
         return soulId;
     }
 
-    public void freeSoul(@NotNull CommandSender sender, int soulId, long soulFreeAfterMs) {
-        Soul soul;
-        if (soulId < 0) {
-            soul = null;
-        } else {
+    @Nullable
+    public Soul getSoulById(int soulId) {
+        Soul soul = null;
+        if (soulId >= 0) {
             synchronized (soulsById) {
-                if (soulId >= soulsById.size()) {
-                    soul = null;
-                } else {
+                if (soulId < soulsById.size()) {
                     soul = soulsById.get(soulId);
                 }
             }
         }
+        return soul;
+    }
+
+    public void freeSoul(@NotNull CommandSender sender, int soulId, long soulFreeAfterMs, boolean canFreeOwn, boolean canFreeAll) {
+        final Soul soul = getSoulById(soulId);
 
         if (soul == null) {
             sender.sendMessage(ChatColor.AQUA+"This soul does not need freeing");
@@ -255,9 +286,17 @@ public class SoulDatabase {
             return;
         }
 
-        if (sender instanceof OfflinePlayer && !soul.owner.equals(((OfflinePlayer) sender).getUniqueId())) {
-            sender.sendMessage(ChatColor.AQUA+"This soul is not yours to free");
-            return;
+        if (!canFreeAll) {
+            final boolean ownSoul = soul.isOwnedBy(sender);
+            if (ownSoul) {
+                if (!canFreeOwn) {
+                    sender.sendMessage(ChatColor.AQUA + "You cannot free your own soul");
+                    return;
+                }
+            } else {
+                sender.sendMessage(ChatColor.AQUA + "This soul is not yours to free");
+                return;
+            }
         }
 
         if (soul.freeSoul(System.currentTimeMillis(), soulFreeAfterMs)) {
@@ -313,6 +352,13 @@ public class SoulDatabase {
             this.timestamp = timestamp;
             this.items = items;
             this.xp = xp;
+        }
+
+        public boolean isOwnedBy(CommandSender commandSender) {
+            final UUID owner = this.owner;
+            return owner != null
+                    && commandSender instanceof OfflinePlayer
+                    && owner.equals(((OfflinePlayer) commandSender).getUniqueId());
         }
 
         @SuppressWarnings("BooleanMethodIsAlwaysInverted")

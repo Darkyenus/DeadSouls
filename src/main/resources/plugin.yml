@@ -1,13 +1,16 @@
 name: DeadSouls
-version: '1.2'
+version: '1.3'
 api-version: '1.13'
 main: com.darkyen.minecraft.DeadSouls
 authors: [Darkyen]
 commands:
-  dead_souls_free_soul:
-    description: (Internal command) Allow anyone to reclaim items held by the soul.
-    usage: /dead_souls_free_soul <soul id>
-    permission: com.darkyen.minecraft.deadsouls.hassoul
+  souls:
+    description: View and manipulate souls
+    usage: /souls
+    # Internal sub-commands:
+    # /souls page N     Show more souls
+    # /souls free ID    Free given soul
+    # /souls goto ID    Teleport to given soul
 permissions:
   com.darkyen.minecraft.deadsouls.hassoul:
     description: Has soul that holds onto their items.
@@ -18,3 +21,21 @@ permissions:
   com.darkyen.minecraft.deadsouls.hassoul.items:
     description: If the player has a soul, it stores their items
     default: true
+  com.darkyen.minecraft.deadsouls.souls:
+    description: List souls with /souls command
+    default: true
+  com.darkyen.minecraft.deadsouls.souls.all:
+    description: /souls displays all souls, even those that are not yours
+    default: op
+  com.darkyen.minecraft.deadsouls.souls.free:
+    description: Free to your souls through /souls command and through quick link
+    default: true
+  com.darkyen.minecraft.deadsouls.souls.free.all:
+    description: Free anyone's soul through /souls command
+    default: op
+  com.darkyen.minecraft.deadsouls.souls.goto:
+    description: Teleport to your souls through /souls command
+    default: op
+  com.darkyen.minecraft.deadsouls.souls.goto.all:
+    description: Teleport to any soul through /souls command
+    default: op

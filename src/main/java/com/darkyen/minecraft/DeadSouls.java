@@ -10,6 +10,7 @@ import org.bukkit.Color;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.Particle;
 import org.bukkit.Server;
 import org.bukkit.SoundCategory;
@@ -25,6 +26,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -462,22 +464,184 @@ public class DeadSouls extends JavaPlugin implements Listener {
             return false;
         }
 
-        if ("dead_souls_free_soul".equals(command.getName()) && args.length == 1) {
+        if (!"souls".equalsIgnoreCase(command.getName())) {
+            return false;
+        }
+
+        final String word = args.length >= 1 ? args[0] : "";
+        int number;
+        try {
+            number = args.length >= 2 ? Integer.parseInt(args[1]) : -1;
+        } catch (NumberFormatException nfe) {
+            number = -1;
+        }
+
+        if ("free".equalsIgnoreCase(word)) {
             if (!soulFreeingEnabled) {
+                sender.sendMessage(org.bukkit.ChatColor.RED+"This world does not understand the concept of freeing");
                 return true;
             }
 
-            final int soulId;
-            try {
-                soulId = Integer.parseInt(args[0]);
-            } catch (NumberFormatException e) {
-                return false;
-            }
-
-            soulDatabase.freeSoul(sender, soulId, soulFreeAfterMs);
+            soulDatabase.freeSoul(sender, number, soulFreeAfterMs,
+                    sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.free"),
+                    sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.free.all"));
             return true;
         }
-        return false;
+
+        if ("goto".equalsIgnoreCase(word)) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage(org.bukkit.ChatColor.RED+"This sub-command is only accessible in-game");
+                return true;
+            }
+
+            final SoulDatabase.Soul soul = soulDatabase.getSoulById(number);
+            if (soul == null) {
+                sender.sendMessage(org.bukkit.ChatColor.RED+"This soul does not exist");
+                return true;
+            }
+
+            if (!sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.goto.all")) {
+                if (soul.isOwnedBy(sender)) {
+                    if (!sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.goto")) {
+                        sender.sendMessage(org.bukkit.ChatColor.RED+"You are not allowed to do that");
+                        return true;
+                    }
+                } else {
+                    sender.sendMessage(org.bukkit.ChatColor.RED+"You are not allowed to do that");
+                    return true;
+                }
+            }
+
+            final World world = getServer().getWorld(soul.locationWorld);
+            if (world == null) {
+                sender.sendMessage(org.bukkit.ChatColor.RED+"The soul is not in any world");
+                return true;
+            }
+
+            ((Player)sender).teleport(new Location(world, soul.locationX, soul.locationY, soul.locationZ), PlayerTeleportEvent.TeleportCause.COMMAND);
+            sender.sendMessage(org.bukkit.ChatColor.AQUA+"Teleported");
+            return true;
+        }
+
+        boolean listOwnSouls = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls");
+        boolean listAllSouls = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.all");
+
+        if (!listOwnSouls && !listAllSouls) {
+            return false;
+        }
+
+        if (word.isEmpty()) {
+            if (number < 0) {
+                number = 0;
+            }
+        } else if (!"page".equalsIgnoreCase(word)) {
+            return false;
+        }
+
+        final UUID senderUUID = (sender instanceof OfflinePlayer) ? ((OfflinePlayer) sender).getUniqueId() : null;
+
+        if (!(sender instanceof Player)) {
+            // Console output
+            final List<SoulDatabase.@Nullable Soul> soulsById = soulDatabase.getSoulsById();
+            int shownSouls = 0;
+            synchronized (soulsById) {
+                for (int id = 0; id < soulsById.size(); id++) {
+                    final SoulDatabase.Soul soul = soulsById.get(id);
+                    if (soul == null) {
+                        continue;
+                    }
+                    shownSouls++;
+
+                    final World world = getServer().getWorld(soul.locationWorld);
+                    final String worldStr = world == null ? soul.locationWorld.toString() : world.getName();
+
+                    final String ownerStr;
+                    if (soul.owner == null) {
+                        ownerStr = "<free>";
+                    } else {
+                        final OfflinePlayer ownerPlayer = getServer().getOfflinePlayer(soul.owner);
+                        final String ownerPlayerName = ownerPlayer.getName();
+                        if (ownerPlayerName == null) {
+                            ownerStr = soul.owner.toString();
+                        } else {
+                            ownerStr = ownerPlayerName;
+                        }
+                    }
+
+                    sender.sendMessage(String.format("%d) %s %.1f %.1f %.1f   %s", id, worldStr, soul.locationX, soul.locationY, soul.locationZ, ownerStr));
+                }
+            }
+            sender.sendMessage(shownSouls+" souls");
+        } else {
+            // Normal player output
+            final List<SoulDatabase.@NotNull SoulAndId> souls = soulDatabase.getSoulsByOwnerAndWorld(listAllSouls ? null : senderUUID, ((Player) sender).getWorld().getUID());
+            final Location location = ((Player) sender).getLocation();
+            souls.sort(Comparator.comparingDouble(soulAndId -> Util.distance2(soulAndId.soul, location, 1)));
+
+            final boolean canFree = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.free");
+            final boolean canFreeAll = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.free.all");
+            final boolean canGoto = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.goto");
+            final boolean canGotoAll = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.goto.all");
+
+            final int soulsPerPage = 6;
+            for (int i = Math.max(soulsPerPage * number, 0), end = Math.min(i + soulsPerPage, souls.size()); i < end; i++) {
+                final SoulDatabase.SoulAndId soulAndId = souls.get(i);
+                final float distance = (float) Math.sqrt(distance2(soulAndId.soul, location, 1));
+
+                final TextComponent baseText = new TextComponent(String.format("%.1f m", distance));
+                baseText.setColor(ChatColor.AQUA);
+
+                final boolean ownSoul = soulAndId.soul.isOwnedBy(sender);
+
+                if (soulAndId.soul.owner != null && (canFreeAll || (ownSoul && canFree))) {
+                    final TextComponent freeButton = new TextComponent("Free");
+                    freeButton.setColor(ChatColor.GREEN);
+                    freeButton.setBold(true);
+                    freeButton.setUnderlined(true);
+                    freeButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls free "+soulAndId.id));
+                    baseText.addExtra("  ");
+                    baseText.addExtra(freeButton);
+                }
+
+                if (canGotoAll || (ownSoul && canGoto)) {
+                    final TextComponent gotoButton = new TextComponent("Teleport");
+                    gotoButton.setColor(ChatColor.GOLD);
+                    gotoButton.setBold(true);
+                    gotoButton.setUnderlined(true);
+                    gotoButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls goto "+soulAndId.id));
+                    baseText.addExtra("  ");
+                    baseText.addExtra(gotoButton);
+                }
+
+                sender.spigot().sendMessage(baseText);
+            }
+
+            final boolean leftArrow = number > 0;
+            final int pages = (souls.size() + soulsPerPage - 1) / soulsPerPage;
+            final boolean rightArrow = number + 1 < pages;
+
+            final TextComponent arrows = new TextComponent();
+            final TextComponent left = new TextComponent(leftArrow ? "<<" : "  ");
+            left.setColor(ChatColor.GRAY);
+            if (leftArrow) {
+                left.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls page " + (number - 1)));
+            }
+            arrows.addExtra(left);
+
+            arrows.addExtra(" page "+(number + 1)+"/"+pages+" ");
+
+            final TextComponent right = new TextComponent(rightArrow ? ">>" : "  ");
+            right.setColor(ChatColor.GRAY);
+            if (rightArrow) {
+                right.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls page "+(number + 1)));
+            }
+            arrows.addExtra(right);
+            arrows.addExtra(" ("+souls.size()+" souls total)");
+
+            sender.spigot().sendMessage(arrows);
+        }
+
+        return true;
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
@@ -571,7 +735,10 @@ public class DeadSouls extends JavaPlugin implements Listener {
         soulDatabaseChanged = true;
 
         // Do not offer to free the soul if it will be free sooner than the player can click the button
-        if (owner != null && soulFreeAfterMs > 1000 && soulFreeingEnabled && textFreeMySoul != null && !textFreeMySoul.isEmpty()) {
+        if (owner != null && soulFreeAfterMs > 1000
+                && soulFreeingEnabled && textFreeMySoul != null && !textFreeMySoul.isEmpty()
+                && (player.hasPermission("com.darkyen.minecraft.deadsouls.souls.free")
+                    || player.hasPermission("com.darkyen.minecraft.deadsouls.souls.free.all"))) {
             final TextComponent star = new TextComponent("✦");
             star.setColor(ChatColor.YELLOW);
             final TextComponent freeMySoul = new TextComponent(" "+textFreeMySoul+" ");
@@ -582,7 +749,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 freeMySoul.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                         new BaseComponent[]{new TextComponent(textFreeMySoulTooltip)}));
             }
-            freeMySoul.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dead_souls_free_soul " + soulId));
+            freeMySoul.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls free " + soulId));
             player.spigot().sendMessage(ChatMessageType.CHAT, star, freeMySoul, star);
         }
 
