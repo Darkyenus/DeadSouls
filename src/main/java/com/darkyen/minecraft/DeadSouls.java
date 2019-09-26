@@ -19,10 +19,13 @@ import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -39,12 +42,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.darkyen.minecraft.Util.distance2;
 import static com.darkyen.minecraft.Util.getTotalExperience;
@@ -121,6 +126,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private Particle.DustOptions soulDustOptionsXp = new Particle.DustOptions(DEFAULT_SOUL_DUST_COLOR_XP, DEFAULT_SOUL_DUST_SIZE_XP);
     @NotNull
     private Particle.DustOptions soulDustOptionsGone = new Particle.DustOptions(DEFAULT_SOUL_DUST_COLOR_GONE, DEFAULT_SOUL_DUST_SIZE_GONE);
+
+    private final EnumSet<EntityType> animalsWithSouls = EnumSet.noneOf(EntityType.class);
 
     @NotNull
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
@@ -313,8 +320,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         final FileConfiguration config = getConfig();
-        soulFreeAfterMs = parseTimeMs(config.getString("soul-free-after"), Long.MAX_VALUE, getLogger());
-        soulFadesAfterMs = parseTimeMs(config.getString("soul-fades-after"), Long.MAX_VALUE, getLogger());
+        final Logger LOG = getLogger();
+        soulFreeAfterMs = parseTimeMs(config.getString("soul-free-after"), Long.MAX_VALUE, LOG);
+        soulFadesAfterMs = parseTimeMs(config.getString("soul-fades-after"), Long.MAX_VALUE, LOG);
 
         {
             this.retainedXPPercent = 90;
@@ -331,21 +339,21 @@ public class DeadSouls extends JavaPlugin implements Listener {
                     final int number = Integer.parseInt(sanitizedRetainedXp);
                     if (percent) {
                         if (number < 0 || number > 100) {
-                            getLogger().log(Level.WARNING, "Invalid configuration: retained-xp percent must be between 0 and 1");
+                            LOG.log(Level.WARNING, "Invalid configuration: retained-xp percent must be between 0 and 1");
                         } else {
                             retainedXPPercent = number / 100f;
                             retainedXPPerLevel = 0;
                         }
                     } else {
                         if (number < 0) {
-                            getLogger().log(Level.WARNING, "Invalid configuration: retained-xp per level must be positive");
+                            LOG.log(Level.WARNING, "Invalid configuration: retained-xp per level must be positive");
                         } else {
                             retainedXPPercent = -1f;
                             retainedXPPerLevel = number;
                         }
                     }
                 } catch (NumberFormatException nfe) {
-                    getLogger().log(Level.WARNING, "Invalid configuration: retained-xp has invalid format");
+                    LOG.log(Level.WARNING, "Invalid configuration: retained-xp has invalid format");
                 }
             }
         }
@@ -357,9 +365,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
         soundSoulDropped = normalizeKey(config.getString("sound-soul-dropped", DEFAULT_SOUND_SOUL_DROPPED));
         volumeSoulCalling = (float)config.getDouble("volume-soul-calling", DEFAULT_VOLUME_SOUL_CALLING);
 
-        soulDustOptionsItems = new Particle.DustOptions(parseColor(config.getString("color-soul-items"), DEFAULT_SOUL_DUST_COLOR_ITEMS, getLogger()), DEFAULT_SOUL_DUST_SIZE_ITEMS);
-        soulDustOptionsXp = new Particle.DustOptions(parseColor(config.getString("color-soul-xp"), DEFAULT_SOUL_DUST_COLOR_XP, getLogger()), DEFAULT_SOUL_DUST_SIZE_XP);
-        soulDustOptionsGone = new Particle.DustOptions(parseColor(config.getString("color-soul-gone"), DEFAULT_SOUL_DUST_COLOR_GONE, getLogger()), DEFAULT_SOUL_DUST_SIZE_GONE);
+        soulDustOptionsItems = new Particle.DustOptions(parseColor(config.getString("color-soul-items"), DEFAULT_SOUL_DUST_COLOR_ITEMS, LOG), DEFAULT_SOUL_DUST_SIZE_ITEMS);
+        soulDustOptionsXp = new Particle.DustOptions(parseColor(config.getString("color-soul-xp"), DEFAULT_SOUL_DUST_COLOR_XP, LOG), DEFAULT_SOUL_DUST_SIZE_XP);
+        soulDustOptionsGone = new Particle.DustOptions(parseColor(config.getString("color-soul-gone"), DEFAULT_SOUL_DUST_COLOR_GONE, LOG), DEFAULT_SOUL_DUST_SIZE_GONE);
 
         textFreeMySoul = config.getString("text-free-my-soul", DEFAULT_TEXT_FREE_MY_SOUL);
         textFreeMySoulTooltip = config.getString("text-free-my-soul-tooltip", DEFAULT_TEXT_FREE_MY_SOUL_TOOLTIP);
@@ -381,12 +389,24 @@ public class DeadSouls extends JavaPlugin implements Listener {
                         sb.append(value.name().toLowerCase()).append(", ");
                     }
                     sb.setLength(sb.length() - 2);
-                    getLogger().log(Level.WARNING, sb.toString());
+                    LOG.log(Level.WARNING, sb.toString());
                 }
             }
         }
 
         smartSoulPlacement = config.getBoolean("smart-soul-placement", true);
+
+        animalsWithSouls.clear();
+        for (String animalName : config.getStringList("animals-with-souls")) {
+            final EntityType entityType;
+            try {
+                entityType = EntityType.valueOf(animalName);
+            } catch (IllegalArgumentException e) {
+                LOG.log(Level.WARNING, "Ignoring animal type for soul \""+animalName+"\", no such entity name");
+                continue;
+            }
+            animalsWithSouls.add(entityType);
+        }
 
         saveDefaultConfig();
 
@@ -402,14 +422,14 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 } catch (ClassNotFoundException e) {
                     continue;
                 }
-                getLogger().info("Found test class: " + testClassName);
+                LOG.info("Found test class: " + testClassName);
 
                 final Method runLiveTest = testClass.getMethod("runLiveTest", Plugin.class);
                 runLiveTest.invoke(null, this);
 
-                getLogger().info("Test successful");
+                LOG.info("Test successful");
             } catch (Exception e) {
-                getLogger().log(Level.INFO, "Failed to run tests of " + testClassName, e);
+                LOG.log(Level.INFO, "Failed to run tests of " + testClassName, e);
             }
         }
 
@@ -423,7 +443,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 try {
                     soulDatabase.loadLegacy(legacySoulDb);
                 } catch (Exception e) {
-                    getLogger().log(Level.SEVERE, "Failed to load legacy soul database, old souls will not be present", e);
+                    LOG.log(Level.SEVERE, "Failed to load legacy soul database, old souls will not be present", e);
                 }
             }
         }
@@ -662,7 +682,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         final SoulDatabase soulDatabase = this.soulDatabase;
         if (soulDatabase == null) {
-            getLogger().log(Level.WARNING, "processPlayers: soulDatabase not loaded yet");
+            getLogger().log(Level.WARNING, "onPlayerDeath: soulDatabase not loaded yet");
             return;
         }
 
@@ -766,6 +786,42 @@ public class DeadSouls extends JavaPlugin implements Listener {
             event.setNewTotalExp(0);
             event.setDroppedExp(0);
         }
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onEntityDeath(EntityDeathEvent event) {
+        final LivingEntity entity = event.getEntity();
+
+        if (entity instanceof Player || !animalsWithSouls.contains(entity.getType())) {
+            return;
+        }
+
+        final ItemStack[] soulItems = event.getDrops().toArray(NO_ITEM_STACKS);
+        final int soulXp = event.getDroppedExp();
+
+        if (soulXp == 0 && soulItems.length == 0) {
+            // Soul would be empty
+            return;
+        }
+
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            getLogger().log(Level.WARNING, "onEntityDeath: soulDatabase not loaded yet");
+            return;
+        }
+
+        final Location soulLocation = entity.getLocation();
+
+        final World world = entity.getWorld();
+        soulDatabase.addSoul(null, world.getUID(), soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp);
+        soulDatabaseChanged = true;
+
+        if (!soundSoulDropped.isEmpty()) {
+            world.playSound(soulLocation, soundSoulDropped, SoundCategory.MASTER, 1.1f, 1.7f);
+        }
+
+        event.getDrops().clear();
+        event.setDroppedExp(0);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

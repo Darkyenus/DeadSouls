@@ -32,6 +32,11 @@ retained-xp: 90%
 # Similarly for falling into lava.
 smart-soul-placement: true
 
+# EXPERIMENTAL: These entities will drop their items and XP as an soul
+# instead of dropping them on the ground. Entries must match names of enum constants from
+# https://hub.spigotmc.org/javadocs/spigot/org/bukkit/entity/EntityType.html perfectly, even the letter case!
+animals-with-souls: []
+
 # Sound played when collecting XP from a soul
 sound-soul-collect-xp: entity.experience_orb.pickup
 # Sound played when collecting items from a soul
