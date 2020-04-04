@@ -177,6 +177,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         for (Map.Entry<Player, PlayerSoulInfo> entry : watchedPlayers.entrySet()) {
             final Player player = entry.getKey();
+            final GameMode playerGameMode = player.getGameMode();
+            final World world = player.getWorld();
             final PlayerSoulInfo info = entry.getValue();
 
             boolean searchNewSouls = refreshNearbySoulCache;
@@ -188,9 +190,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 searchNewSouls = true;
             }
 
-            final World world = player.getWorld();
-
-            {
+            if (playerGameMode != GameMode.SPECTATOR) {
                 final Block underPlayer =
                         world.getBlockAt(playerLocation.getBlockX(), playerLocation.getBlockY() - 1, playerLocation.getBlockZ());
                 if (underPlayer.getType().isSolid()) {
@@ -225,9 +225,10 @@ public class DeadSouls extends JavaPlugin implements Listener {
             // Send particles
             final int soulCount = visibleSouls.size();
             int remainingSoulsToShow = 16;
+            final boolean canSeeAllSouls = playerGameMode == GameMode.SPECTATOR && player.hasPermission("com.darkyen.minecraft.deadsouls.spectatesouls");
             for (int i = 0; i < soulCount && remainingSoulsToShow > 0; i++) {
                 final SoulDatabase.Soul soul = visibleSouls.get(i);
-                if (!soul.isAccessibleBy(player, now, soulFreeAfterMs)) {
+                if (!canSeeAllSouls && !soul.isAccessibleBy(player, now, soulFreeAfterMs)) {
                     // Soul of somebody else, do not show nor collect
                     continue;
                 }
@@ -252,13 +253,12 @@ public class DeadSouls extends JavaPlugin implements Listener {
             }
 
             // Process collisions
-            final GameMode gameMode = player.getGameMode();
-            if (!player.isDead() && (gameMode == GameMode.SURVIVAL || gameMode == GameMode.ADVENTURE)) {
+            if (!player.isDead() && (playerGameMode == GameMode.SURVIVAL || playerGameMode == GameMode.ADVENTURE)) {
                 //noinspection ForLoopReplaceableByForEach
                 for (int soulI = 0; soulI < visibleSouls.size(); soulI++) {
                     final SoulDatabase.Soul closestSoul = visibleSouls.get(soulI);
                     if (!closestSoul.isAccessibleBy(player, now, soulFreeAfterMs)) {
-                        // Soul of somebody else, do not show nor collect
+                        // Soul of somebody else, do not collect
                         continue;
                     }
 

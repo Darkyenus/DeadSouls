@@ -21,6 +21,9 @@ permissions:
   com.darkyen.minecraft.deadsouls.hassoul.items:
     description: If the player has a soul, it stores their items
     default: true
+  com.darkyen.minecraft.deadsouls.spectatesouls:
+    description: If the player is in spectator mode, they can see all souls
+    default: true
   com.darkyen.minecraft.deadsouls.souls:
     description: List souls with /souls command
     default: true
