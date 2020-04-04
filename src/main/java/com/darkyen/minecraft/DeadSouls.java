@@ -69,6 +69,8 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private long soulFreeAfterMs = Long.MAX_VALUE;
     private long soulFadesAfterMs = Long.MAX_VALUE;
 
+    private long autoSaveMs = 0L;
+
     private float retainedXPPercent;
     private int retainedXPPerLevel;
 
@@ -131,7 +133,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     @NotNull
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
-    private boolean soulDatabaseChanged = false;
+    private boolean refreshNearbySoulCache = false;
 
     private static final double COLLECTION_DISTANCE2 = NumberConversions.square(1);
 
@@ -145,6 +147,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private final Random processPlayers_random = new Random();
 
     private long processPlayers_nextFadeCheck = 0;
+    private long processPlayers_nextAutoSave = 0;
 
     private void processPlayers() {
         final SoulDatabase soulDatabase = this.soulDatabase;
@@ -158,22 +161,24 @@ public class DeadSouls extends JavaPlugin implements Listener {
         if (now > processPlayers_nextFadeCheck && soulFadesAfterMs < Long.MAX_VALUE) {
             final int faded = soulDatabase.removeFadedSouls(soulFadesAfterMs);
             if (faded > 0) {
-                this.soulDatabaseChanged = true;
-                getLogger().log(Level.INFO, "Removed "+faded+" faded soul(s)");
+                this.refreshNearbySoulCache = true;
+                getLogger().log(Level.FINE, "Removed "+faded+" faded soul(s)");
             }
-            processPlayers_nextFadeCheck = now + 1000 * 60;// Check every minute
+            processPlayers_nextFadeCheck = now + 1000 * 60 * 5;// Check every 5 minutes
         }
 
-        final boolean soulDatabaseChanged = this.soulDatabaseChanged;
-        this.soulDatabaseChanged = false;
+        final boolean refreshNearbySoulCache = this.refreshNearbySoulCache;
+        this.refreshNearbySoulCache = false;
 
         final boolean playCallingSounds = !soundSoulCalling.isEmpty() && volumeSoulCalling > 0f && this.processPlayers_random.nextInt(12) == 0;
+
+        boolean databaseChanged = false;
 
         for (Map.Entry<Player, PlayerSoulInfo> entry : watchedPlayers.entrySet()) {
             final Player player = entry.getKey();
             final PlayerSoulInfo info = entry.getValue();
 
-            boolean searchNewSouls = soulDatabaseChanged;
+            boolean searchNewSouls = refreshNearbySoulCache;
 
             // Update location
             final Location playerLocation = player.getLocation(processPlayers_playerLocation);
@@ -267,6 +272,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                             if (!soundSoulCollectXp.isEmpty() && closestSoulLocation != null) {
                                 player.playSound(closestSoulLocation, soundSoulCollectXp, 1f, 1f);
                             }
+                            databaseChanged = true;
                         }
 
                         final @NotNull ItemStack[] items = closestSoul.items;
@@ -281,10 +287,12 @@ public class DeadSouls extends JavaPlugin implements Listener {
                             boolean someCollected = false;
                             if (overflow.size() < items.length) {
                                 someCollected = true;
+                                databaseChanged = true;
                             } else {
                                 for (Map.Entry<Integer, ItemStack> overflowEntry : overflow.entrySet()) {
                                     if (!items[overflowEntry.getKey()].equals(overflowEntry.getValue())) {
                                         someCollected = true;
+                                        databaseChanged = true;
                                         break;
                                     }
                                 }
@@ -298,7 +306,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                         if (closestSoul.xp <= 0 && closestSoul.items.length <= 0) {
                             // Soul is depleted
                             soulDatabase.removeSoul(closestSoul);
-                            this.soulDatabaseChanged = true;
+                            this.refreshNearbySoulCache = true;
 
                             // Do some fancy effect
                             if (closestSoulLocation != null) {
@@ -315,6 +323,16 @@ public class DeadSouls extends JavaPlugin implements Listener {
                 }
             }
         }
+
+        if (databaseChanged) {
+            soulDatabase.markDirty();
+        }
+
+        final long autoSaveMs = this.autoSaveMs;
+        if (now > processPlayers_nextAutoSave) {
+            processPlayers_nextAutoSave = now + autoSaveMs;
+            soulDatabase.autoSave();
+        }
     }
 
     @Override
@@ -323,6 +341,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         final Logger LOG = getLogger();
         soulFreeAfterMs = parseTimeMs(config.getString("soul-free-after"), Long.MAX_VALUE, LOG);
         soulFadesAfterMs = parseTimeMs(config.getString("soul-fades-after"), Long.MAX_VALUE, LOG);
+        autoSaveMs = parseTimeMs(config.getString("auto-save"), 0L, LOG);
 
         {
             this.retainedXPPercent = 90;
@@ -448,7 +467,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             }
         }
 
-        soulDatabaseChanged = true;
+        refreshNearbySoulCache = true;
 
         for (Player onlinePlayer : server.getOnlinePlayers()) {
             watchedPlayers.put(onlinePlayer, new PlayerSoulInfo());
@@ -464,7 +483,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             try {
                 final int faded = soulDatabase.removeFadedSouls(soulFadesAfterMs);
                 if (faded > 0) {
-                    getLogger().log(Level.INFO, "Removed "+faded+" faded soul(s)");
+                    getLogger().log(Level.FINE, "Removed "+faded+" faded soul(s)");
                 }
                 soulDatabase.save();
             } catch (Exception e) {
@@ -752,7 +771,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         final int soulId = soulDatabase.addSoul(owner, player.getWorld().getUID(),
                 soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp);
-        soulDatabaseChanged = true;
+        refreshNearbySoulCache = true;
 
         // Do not offer to free the soul if it will be free sooner than the player can click the button
         if (owner != null && soulFreeAfterMs > 1000
@@ -814,7 +833,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
         final World world = entity.getWorld();
         soulDatabase.addSoul(null, world.getUID(), soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp);
-        soulDatabaseChanged = true;
+        refreshNearbySoulCache = true;
 
         if (!soundSoulDropped.isEmpty()) {
             world.playSound(soulLocation, soundSoulDropped, SoundCategory.MASTER, 1.1f, 1.7f);

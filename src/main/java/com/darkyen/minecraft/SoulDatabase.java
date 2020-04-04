@@ -59,6 +59,8 @@ public class SoulDatabase {
     @NotNull
     private final Path databaseFile;
 
+    private boolean dirty = false;
+
 	public SoulDatabase(@Nullable Plugin owner, @NotNull Path databaseFile) {
 		this.owner = owner;
 		this.databaseFile = databaseFile;
@@ -191,6 +193,7 @@ public class SoulDatabase {
                 if (failedWrites > 0) {
                     LOG.log(Level.WARNING, failedWrites + " soul(s) failed to save");
                 }
+                LOG.log(Level.INFO, "Saved");
                 return true;
             }
             LOG.log(Level.SEVERE, "Failed to save souls", exception);
@@ -219,6 +222,10 @@ public class SoulDatabase {
             }
         }
 
+        if (fadedSouls > 0) {
+            dirty = true;
+        }
+
         return fadedSouls;
     }
 
@@ -240,24 +247,45 @@ public class SoulDatabase {
             }
         }
         souls.insert(soul);
+        dirty = true;
+        return soulId;
+    }
+
+    public void markDirty() {
+        dirty = true;
+    }
+
+    public void autoSave() {
+        if (!dirty) {
+            return;
+        }
+
         if (this.owner != null) {
+            dirty = false;
             Bukkit.getScheduler().runTaskAsynchronously(this.owner, () -> {
+                boolean success = false;
                 try {
-                    save();
+                    if (save()) {
+                        success = true;
+                    }
                 } catch (IOException e) {
                     LOG.log(Level.WARNING, "Failed to save ItemStore asynchronously", e);
+                } finally {
+                    if (!success) {
+                        dirty = true;
+                    }
                 }
             });
         } else {
             LOG.log(Level.INFO, "Saving synchronously");
             try {
-                save();
+                if (save()) {
+                    dirty = false;
+                }
             } catch (IOException e) {
                 LOG.log(Level.WARNING, "Failed to save ItemStore synchronously", e);
             }
         }
-
-        return soulId;
     }
 
     @Nullable
@@ -301,6 +329,7 @@ public class SoulDatabase {
 
         if (soul.freeSoul(System.currentTimeMillis(), soulFreeAfterMs)) {
             sender.sendMessage(ChatColor.AQUA+"Soul has been set free");
+            dirty = true;
         } else {
             sender.sendMessage(ChatColor.AQUA+"This soul is already free");
         }
@@ -313,6 +342,7 @@ public class SoulDatabase {
                 LOG.log(Level.WARNING, "Soul " + toRemove + " already removed from BY-ID");
             } else {
                 soulsById.set(i, null);
+                dirty = true;
             }
         }
 

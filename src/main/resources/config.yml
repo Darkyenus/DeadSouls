@@ -69,3 +69,10 @@ color-soul-gone: FFFF00
 text-free-my-soul: "Free my soul"
 # Text displayed as a tooltip on button to free player's soul (Set to empty to disable the tooltip)
 text-free-my-soul-tooltip: "Allows other players to collect the soul immediately"
+
+# <time> How frequently should auto-save of the soul database occur (only if modified and not more frequently than once per second)
+# never      = saving happens only on server restart (not generally recommended, unless you are sure that your server is stable)
+# otherwise  = plugin will attempt to save periodically, after this time interval passes
+#              0s is recommended for servers with infrequent deaths
+#              1m or 5m might be sensible values for large servers
+auto-save: 0s
