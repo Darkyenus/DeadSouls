@@ -8,6 +8,7 @@ import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Color;
 import org.bukkit.GameMode;
+import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -700,10 +701,6 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onPlayerDeath(PlayerDeathEvent event) {
-        if (event.getKeepInventory() && event.getKeepLevel()) {
-            return;
-        }
-
         final Player player = event.getEntity();
         if (!player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul")) {
             return;
@@ -736,7 +733,10 @@ public class DeadSouls extends JavaPlugin implements Listener {
         }
 
         int soulXp;
-        if (event.getKeepLevel() || !player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul.xp")) {
+        if (event.getKeepLevel() || !player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul.xp")
+                // Required because getKeepLevel is not set when world's KEEP_INVENTORY is set, but it has the same effect
+                // See https://hub.spigotmc.org/jira/browse/SPIGOT-2222
+                || Boolean.TRUE.equals(player.getWorld().getGameRuleValue(GameRule.KEEP_INVENTORY))) {
             // We don't modify XP for this death at all
             soulXp = 0;
         } else {
@@ -811,6 +811,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             player.getWorld().playSound(soulLocation, soundSoulDropped, SoundCategory.MASTER, 1.1f, 1.7f);
         }
 
+        // No need to set setKeepInventory/Level to false, because if we got here, it already is false
         if (clearItemDrops) {
             event.getDrops().clear();
         }
