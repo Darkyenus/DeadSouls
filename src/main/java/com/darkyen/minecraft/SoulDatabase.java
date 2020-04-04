@@ -193,7 +193,6 @@ public class SoulDatabase {
                 if (failedWrites > 0) {
                     LOG.log(Level.WARNING, failedWrites + " soul(s) failed to save");
                 }
-                LOG.log(Level.INFO, "Saved");
                 return true;
             }
             LOG.log(Level.SEVERE, "Failed to save souls", exception);

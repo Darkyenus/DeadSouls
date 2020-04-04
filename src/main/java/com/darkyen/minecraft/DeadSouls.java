@@ -562,6 +562,21 @@ public class DeadSouls extends JavaPlugin implements Listener {
             return true;
         }
 
+        if ("reload".equalsIgnoreCase(word) && sender.isOp()) {
+            sender.sendMessage(org.bukkit.ChatColor.RED+"----------------------------");
+            sender.sendMessage(org.bukkit.ChatColor.RED+"Reloading plugin Dead Souls");
+            sender.sendMessage(org.bukkit.ChatColor.RED+"RELOAD FUNCTIONALITY IS ONLY FOR TESTING AND EXPERIMENTING AND SHOULD NEVER BE USED ON A LIVE SERVER!!!");
+            sender.sendMessage(org.bukkit.ChatColor.RED+"If you encounter any problems with the plugin after the reload, restart the server!");
+            sender.sendMessage(org.bukkit.ChatColor.RED+"----------------------------");
+
+            final Server server = getServer();
+            server.getPluginManager().disablePlugin(this);
+            server.getPluginManager().enablePlugin(this);
+
+            sender.sendMessage(org.bukkit.ChatColor.RED+" - Reload done - ");
+            return true;
+        }
+
         boolean listOwnSouls = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls");
         boolean listAllSouls = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.all");
 
