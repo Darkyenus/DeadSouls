@@ -31,6 +31,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -45,12 +46,14 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 import static com.darkyen.minecraft.Util.distance2;
 import static com.darkyen.minecraft.Util.getTotalExperience;
@@ -131,6 +134,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
     private Particle.DustOptions soulDustOptionsGone = new Particle.DustOptions(DEFAULT_SOUL_DUST_COLOR_GONE, DEFAULT_SOUL_DUST_SIZE_GONE);
 
     private final EnumSet<EntityType> animalsWithSouls = EnumSet.noneOf(EntityType.class);
+
+    private final ArrayList<Pattern> worldPatterns = new ArrayList<>();
+    private final HashSet<UUID> enabledWorlds = new HashSet<>();
 
     @NotNull
     private final HashMap<Player, PlayerSoulInfo> watchedPlayers = new HashMap<>();
@@ -428,6 +434,16 @@ public class DeadSouls extends JavaPlugin implements Listener {
             animalsWithSouls.add(entityType);
         }
 
+        worldPatterns.clear();
+        for (String worlds : config.getStringList("worlds")) {
+            worldPatterns.add(Util.compileSimpleGlob(worlds));
+        }
+        if (worldPatterns.isEmpty()) {
+            LOG.warning("No world patterns specified, souls will not be created anywhere.");
+        }
+
+        refreshEnabledWorlds();
+
         saveDefaultConfig();
 
         final Server server = getServer();
@@ -475,6 +491,26 @@ public class DeadSouls extends JavaPlugin implements Listener {
         }
 
         server.getScheduler().runTaskTimer(this, this::processPlayers, 20, 20);
+    }
+
+    private void refreshEnabledWorlds() {
+        final HashSet<UUID> worlds = this.enabledWorlds;
+        worlds.clear();
+
+        for (World world : getServer().getWorlds()) {
+            final String name = world.getName();
+            final UUID uuid = world.getUID();
+            final String uuidString = uuid.toString();
+            for (Pattern pattern : this.worldPatterns) {
+                if (pattern.matcher(name).matches() || pattern.matcher(uuidString).matches()) {
+                    worlds.add(uuid);
+                }
+            }
+        }
+
+        if (!worldPatterns.isEmpty() && worlds.isEmpty()) {
+            getLogger().warning("No worlds match, souls will not be created in any world.");
+        }
     }
 
     @Override
@@ -572,6 +608,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
 
             final Server server = getServer();
             server.getPluginManager().disablePlugin(this);
+            reloadConfig();
             server.getPluginManager().enablePlugin(this);
 
             sender.sendMessage(org.bukkit.ChatColor.RED+" - Reload done - ");
@@ -706,10 +743,20 @@ public class DeadSouls extends JavaPlugin implements Listener {
         return true;
     }
 
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
+    public void onWorldLoaded(WorldLoadEvent event) {
+        refreshEnabledWorlds();
+    }
+
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onPlayerDeath(PlayerDeathEvent event) {
         final Player player = event.getEntity();
         if (!player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul")) {
+            return;
+        }
+
+        final World world = player.getWorld();
+        if (!enabledWorlds.contains(world.getUID())) {
             return;
         }
 
@@ -743,7 +790,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         if (event.getKeepLevel() || !player.hasPermission("com.darkyen.minecraft.deadsouls.hassoul.xp")
                 // Required because getKeepLevel is not set when world's KEEP_INVENTORY is set, but it has the same effect
                 // See https://hub.spigotmc.org/jira/browse/SPIGOT-2222
-                || Boolean.TRUE.equals(player.getWorld().getGameRuleValue(GameRule.KEEP_INVENTORY))) {
+                || Boolean.TRUE.equals(world.getGameRuleValue(GameRule.KEEP_INVENTORY))) {
             // We don't modify XP for this death at all
             soulXp = 0;
         } else {
@@ -791,7 +838,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             owner = player.getUniqueId();
         }
 
-        final int soulId = soulDatabase.addSoul(owner, player.getWorld().getUID(),
+        final int soulId = soulDatabase.addSoul(owner, world.getUID(),
                 soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp);
         refreshNearbySoulCache = true;
 
@@ -824,7 +871,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         }
 
         if (!soundSoulDropped.isEmpty()) {
-            player.getWorld().playSound(soulLocation, soundSoulDropped, SoundCategory.MASTER, 1.1f, 1.7f);
+            world.playSound(soulLocation, soundSoulDropped, SoundCategory.MASTER, 1.1f, 1.7f);
         }
 
         // No need to set setKeepInventory/Level to false, because if we got here, it already is false

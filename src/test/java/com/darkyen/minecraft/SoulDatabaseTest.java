@@ -35,7 +35,7 @@ public class SoulDatabaseTest {
 		final ItemStack badItem = new ItemStack(Material.DIAMOND_SWORD, 1) {
 			@Override
 			public @NotNull Map<String, Object> serialize() {
-				throw new RuntimeException("this item is not serializable");
+				throw new RuntimeException("this item is not serializable, sorry (not error)");
 			}
 		};
 

@@ -225,4 +225,23 @@ public class Util {
             return "ItemStack{" + item.getType().name() + " x " + item.getAmount() + ", [broken meta]}";
         }
     }
+
+    public static Pattern compileSimpleGlob(String glob) {
+        final StringBuilder pattern = new StringBuilder();
+        int begin = 0;
+        while (begin < glob.length()) {
+            final int end = glob.indexOf('*', begin);
+
+            if (end == -1) {
+                pattern.append(Pattern.quote(glob.substring(begin)));
+                break;
+            } else {
+                pattern.append(Pattern.quote(glob.substring(begin, end)));
+                pattern.append(".*");
+            }
+            begin = end + 1;
+        }
+
+        return Pattern.compile(pattern.toString());
+    }
 }

@@ -18,6 +18,14 @@ soul-fades-after: never
 #   free: created souls are immediately free and can be collected by anyone
 pvp-behavior: normal
 
+# Patterns for names or UUIDs of worlds in which soul creation is enabled.
+# The asterisk (*) character stands in for 0 or more arbitrary characters.
+# Case sensitive. Note that existing souls are still collectible, even if no more souls are created.
+# Example:  "*" - all worlds
+#           "0000-1111-2222-3333" - world with this UUID
+#           "surv*" - any world whose name begins with "surv", for example "survival", "surv", or "surv1"
+worlds: [ "*" ]
+
 # <percent> = <number> "%"
 # <xp-per-level> = <number>
 
