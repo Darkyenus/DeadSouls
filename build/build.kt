@@ -10,7 +10,7 @@ import java.nio.file.StandardCopyOption
 val liveTesting by configuration("Add live testing capability") {
 	sources modify { it + FileSet(WemiRootFolder / "src/live-test/java") }
 
-	libraryDependencies add { JUnitAPI }
+	libraryDependencies add { Dependency(JUnitAPI) }
 }
 
 val DeadSouls by project(Archetypes.JavaProject) {
@@ -29,8 +29,8 @@ val DeadSouls by project(Archetypes.JavaProject) {
 	}
 	
 	extend(testing) {
-		libraryDependencies add { JUnitAPI }
-		libraryDependencies add { JUnitEngine }
+		libraryDependencies add { Dependency(JUnitAPI) }
+		libraryDependencies add { Dependency(JUnitEngine) }
 		libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.14.4-R0.1-SNAPSHOT") }
 	}
 
