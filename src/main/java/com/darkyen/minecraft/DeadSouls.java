@@ -641,14 +641,21 @@ public class DeadSouls extends JavaPlugin implements Listener {
             final int soulsPerPage = 6;
             for (int i = Math.max(soulsPerPage * number, 0), end = Math.min(i + soulsPerPage, souls.size()); i < end; i++) {
                 final SoulDatabase.SoulAndId soulAndId = souls.get(i);
-                final float distance = (float) Math.sqrt(distance2(soulAndId.soul, location, 1));
+                final SoulDatabase.Soul soul = soulAndId.soul;
+                final float distance = (float) Math.sqrt(distance2(soul, location, 1));
 
                 final TextComponent baseText = new TextComponent(String.format("%.1f m", distance));
                 baseText.setColor(ChatColor.AQUA);
 
-                final boolean ownSoul = soulAndId.soul.isOwnedBy(sender);
+                if (sender.hasPermission("com.darkyen.minecraft.deadsouls.coordinates")) {
+                    final TextComponent coords = new TextComponent(String.format(" %d / %d / %d", Math.round(soul.locationX), Math.round(soul.locationY), Math.round(soul.locationZ)));
+                    coords.setColor(ChatColor.GRAY);
+                    baseText.addExtra(coords);
+                }
 
-                if (soulAndId.soul.owner != null && (canFreeAll || (ownSoul && canFree))) {
+                final boolean ownSoul = soul.isOwnedBy(sender);
+
+                if (soul.owner != null && (canFreeAll || (ownSoul && canFree))) {
                     final TextComponent freeButton = new TextComponent("Free");
                     freeButton.setColor(ChatColor.GREEN);
                     freeButton.setBold(true);
@@ -787,6 +794,15 @@ public class DeadSouls extends JavaPlugin implements Listener {
         final int soulId = soulDatabase.addSoul(owner, player.getWorld().getUID(),
                 soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp);
         refreshNearbySoulCache = true;
+
+        // Show coordinates if the player has poor taste
+        if (player.hasPermission("com.darkyen.minecraft.deadsouls.coordinates")) {
+            final TextComponent skull = new TextComponent("☠");
+            skull.setColor(ChatColor.BLACK);
+            final TextComponent coords = new TextComponent(String.format(" %d / %d / %d ", Math.round(soulLocation.getX()), Math.round(soulLocation.getY()), Math.round(soulLocation.getZ())));
+            coords.setColor(ChatColor.GRAY);
+            player.spigot().sendMessage(skull, coords, skull);
+        }
 
         // Do not offer to free the soul if it will be free sooner than the player can click the button
         if (owner != null && soulFreeAfterMs > 1000
