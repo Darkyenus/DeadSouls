@@ -1,5 +1,5 @@
 name: DeadSouls
-version: '1.4'
+version: '1.5'
 api-version: '1.13'
 main: com.darkyen.minecraft.DeadSouls
 authors: [Darkyen]

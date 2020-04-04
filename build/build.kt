@@ -17,7 +17,7 @@ val DeadSouls by project(Archetypes.JavaProject) {
 
 	projectGroup set { "com.darkyen.minecraft" }
 	projectName set { "DeadSouls" }
-	projectVersion set { "1.4" }
+	projectVersion set { "1.5" }
 
 	repositories add { Repository("spigot-repo", "https://hub.spigotmc.org/nexus/content/repositories/snapshots/") }
 	repositories add { Jitpack }
