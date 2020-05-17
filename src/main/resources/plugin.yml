@@ -45,3 +45,4 @@ permissions:
   com.darkyen.minecraft.deadsouls.souls.goto.all:
     description: Teleport to any soul through /souls command
     default: op
+softdepend: [ItemSoulBind]

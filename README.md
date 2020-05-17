@@ -13,3 +13,8 @@
 - The soul will never disappear (configurable)
 
 The plugin has been designed to be reliable and lightweight. It does not use any non-public API.
+The plugin does not do anything that you wouldn't expect it to do, so it should be fairly compatible
+with a wide variety of other plugins. If you don't know whether a plugin is compatible, just try it! It will probably work.
+Let me know if you encounter any incompatibilities.
+
+This plugin does not track, snoop, or otherwise call home or anywhere else.
