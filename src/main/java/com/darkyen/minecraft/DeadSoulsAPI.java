@@ -1,9 +1,11 @@
 package com.darkyen.minecraft;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,10 +23,23 @@ import java.util.UUID;
  *
  * @since 1.6
  */
+@SuppressWarnings("unused")
 public interface DeadSoulsAPI {
 
-	/** Identifier under which the plugin is accessible in {@link org.bukkit.plugin.PluginManager}. */
-	String PLUGIN_ID = "DeadSouls";
+	/**
+	 * Entry point for this API.
+	 * @return instance of the plugin
+	 * @throws NoClassDefFoundError when the plugin is not installed (actually, Java throws that when it can't load this interface)
+	 * @throws IllegalStateException when DeadSouls plugin exists, but is not loaded
+	 */
+	@NotNull
+	static DeadSoulsAPI instance() throws NoClassDefFoundError, IllegalStateException {
+		final Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("DeadSouls");
+		if (plugin == null) {
+			throw new IllegalStateException("DeadSouls plugin classes are loaded, but the plugin is not");
+		}
+		return (DeadSoulsAPI) plugin;
+	}
 
 	/** Get all souls which exist.
 	 * @param out a collection into which all souls will be added (after being cleared).

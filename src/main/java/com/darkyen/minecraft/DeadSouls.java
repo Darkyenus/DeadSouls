@@ -1180,6 +1180,7 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
             return;
         }
         soulDatabase.removeSoul((SoulDatabase.Soul) soul);
+        refreshNearbySoulCache = true;
     }
 
     @Override
@@ -1204,9 +1205,10 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
         ItemStack[] nnContents = contents == null ? NO_ITEM_STACKS : contents;
         final SoulDatabase soulDatabase = this.soulDatabase;
         if (soulDatabase == null) {
-            //
+            // Sad, but better than returning null which would probably cause crash. This situation can be tested through soulExists.
             return new SoulDatabase.Soul(owner, world, x, y, z, System.currentTimeMillis(), nnContents, xp);
         }
+        refreshNearbySoulCache = true;
         return soulDatabase.addSoul(owner, world, x, y, z, nnContents, xp);
     }
     //endregion

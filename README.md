@@ -18,3 +18,19 @@ with a wide variety of other plugins. If you don't know whether a plugin is comp
 Let me know if you encounter any incompatibilities.
 
 This plugin does not track, snoop, or otherwise call home or anywhere else.
+
+## API and compatibility considerations
+*For developers of other plugins*
+
+This plugins relies on the `PlayerDeathEvent` to do its job.
+This event is handled at `HIGH` priority and respects *keep inventory* and *keep level* flags.
+Items collected into the soul are taken from the drop table, which is then cleared, and similarly for XP.
+
+If you want to prevent some items from dropping, remove them in a lower priority event handler.
+
+There are no other event handlers that could cause compatibility problems.
+
+The plugin provides a public stable API (since version 1.6), which can be obtained through `DeadSoulsAPI.instance()`.
+NOTE: Read the documentation for possible failure modes.
+
+To compile against this plugin, get the dependency here: [![](https://jitpack.io/v/com.darkyen/DeadSouls.svg)](https://jitpack.io/#com.darkyen/DeadSouls).
