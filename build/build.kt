@@ -23,11 +23,9 @@ val DeadSouls by project(Archetypes.JavaProject) {
 	repositories add { Jitpack }
 	repositories add { sonatypeOss("snapshots") }
 
-	extend(compiling) {
-		libraryDependencies add { dependency("org.jetbrains", "annotations", "16.0.2") }
-		libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.14.2-R0.1-SNAPSHOT") }
-	}
-	
+	libraryDependencies add { dependency("org.jetbrains", "annotations", "16.0.2", scope = ScopeProvided) }
+	libraryDependencies add { dependency("org.spigotmc", "spigot-api", "1.14.2-R0.1-SNAPSHOT", scope = ScopeProvided) }
+
 	extend(testing) {
 		libraryDependencies add { Dependency(JUnitAPI) }
 		libraryDependencies add { Dependency(JUnitEngine) }

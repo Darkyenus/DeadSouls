@@ -7,6 +7,7 @@ import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.util.NumberConversions;
@@ -27,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -357,22 +359,28 @@ public class SoulDatabase {
         out.removeIf((soul) -> !worldUID.equals(soul.locationWorld));
     }
 
-    @SuppressWarnings("WeakerAccess")
-    static final class Soul implements SpatialDatabase.Entry {
+    /** A soul in a database. The fields that are not final can be modified,
+     * but don't forget to {@link SoulDatabase#markDirty()} if you do to ensure that the changes are saved. */
+    public static final class Soul implements SpatialDatabase.Entry {
 
+        /** Current owner of the soul by {@link Player#getUniqueId()}. */
         @Nullable
-        UUID owner;
+        public UUID owner;
+        /** World in which the soul is by {@link World#getUID()}. */
         @NotNull
-        final UUID locationWorld;
-        final double locationX, locationY, locationZ;
-        final long timestamp;
-        /** Can be changed when collected */
-        @NotNull
-        ItemStack[] items;
-        /** Can be changed when collected */
-        int xp;
+        public final UUID locationWorld;
+        /** Precise location of the soul in the world. */
+        public final double locationX, locationY, locationZ;
+        /** When was the soul created on clock of {@link System#currentTimeMillis()}. */
+        public final long timestamp;
 
-        Soul(@Nullable UUID owner, @NotNull UUID locationWorld, double x, double y, double z, long timestamp, @NotNull ItemStack[] items, int xp) {
+        /** Can be changed when collected */
+        @NotNull
+        public ItemStack[] items;
+        /** Can be changed when collected */
+        public int xp;
+
+        public Soul(@Nullable UUID owner, @NotNull UUID locationWorld, double x, double y, double z, long timestamp, @NotNull ItemStack[] items, int xp) {
             this.owner = owner;
             this.locationWorld = locationWorld;
             this.locationX = x;
@@ -414,7 +422,6 @@ public class SoulDatabase {
             this.owner = null;
             // Did soul become free on its own?
             return saturatedAdd(timestamp, soulFreeAfterMs) > now;
-
         }
 
         @Override
@@ -464,7 +471,7 @@ public class SoulDatabase {
             if (Double.compare(soul.locationZ, locationZ) != 0) return false;
             if (timestamp != soul.timestamp) return false;
             if (xp != soul.xp) return false;
-            if (owner != null ? !owner.equals(soul.owner) : soul.owner != null) return false;
+            if (!Objects.equals(owner, soul.owner)) return false;
             if (!locationWorld.equals(soul.locationWorld)) return false;
             // Probably incorrect - comparing Object[] arrays with Arrays.equals
             return Arrays.equals(items, soul.items);
@@ -490,23 +497,25 @@ public class SoulDatabase {
     }
 
     static boolean serializeSoul(@NotNull Soul soul, @NotNull DataOutputChannel out) {
+        final @NotNull ItemStack[] items = soul.items;
         try {
             serializeUUID(soul.locationWorld, out);
             out.writeDouble(soul.locationX);
             out.writeDouble(soul.locationY);
             out.writeDouble(soul.locationZ);
-            if (soul.owner == null) {
+            final UUID owner = soul.owner;
+            if (owner == null) {
                 serializeUUID(ZERO_UUID, out);
             } else {
-                serializeUUID(soul.owner, out);
+                serializeUUID(owner, out);
             }
             out.writeLong(soul.timestamp);
             out.writeInt(soul.xp);
 
             final long itemAmountPosition = out.position();
-            out.writeShort(soul.items.length);
+            out.writeShort(items.length);
             int failed = 0;
-            for (ItemStack item : soul.items) {
+            for (ItemStack item : items) {
                 final long itemPosition = out.position();
                 try {
                     final Map<String, Object> map = item.serialize();
@@ -526,11 +535,11 @@ public class SoulDatabase {
             if (failed > 0) {
                 final long endPosition = out.position();
                 out.position(itemAmountPosition);
-                out.writeShort(soul.items.length - failed);
+                out.writeShort(items.length - failed);
                 out.position(endPosition);
             }
         } catch (IOException io) {
-            LOG.log(Level.SEVERE, "Failed to serialize: "+ Arrays.toString(soul.items), io);
+            LOG.log(Level.SEVERE, "Failed to serialize: "+ Arrays.toString(items), io);
             return false;
         }
 

@@ -27,6 +27,9 @@ permissions:
   com.darkyen.minecraft.deadsouls.coordinates:
     description: Coordinates of souls are visible in chat output for this player. Not recommended - breaks immersion.
     default: false
+  com.darkyen.minecraft.deadsouls.distance:
+    description: Distance to the soul is visible in chat output for this player. Not recommended - breaks immersion.
+    default: false
   com.darkyen.minecraft.deadsouls.souls:
     description: List souls with /souls command
     default: true

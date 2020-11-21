@@ -79,8 +79,18 @@ text-free-my-soul: "Free my soul"
 text-free-my-soul-tooltip: "Allows other players to collect the soul immediately"
 
 # <time> How frequently should auto-save of the soul database occur (only if modified and not more frequently than once per second)
-# never      = saving happens only on server restart (not generally recommended, unless you are sure that your server is stable)
+# never      = saving happens only on server restart (not generally recommended, unless you are 100% sure that your server never crashes or when you don't care about item loss and duplication)
 # otherwise  = plugin will attempt to save periodically, after this time interval passes
 #              0s is recommended for servers with infrequent deaths
 #              1m or 5m might be sensible values for large servers
+# Note that the auto-save happens mostly on an off-thread, so it is unlikely to cause any lag,
+# unless the amount of souls you have is really enormous (multiple thousands).
+
+# How to pick this value: Unless you have performance problems when players die
+#  and you know that a lot of players die in a short bursts on your server, keep it at 0s.
+#  Otherwise, there are two things to consider:
+#   The value must be large enough, that multiple players frequently die within that time span.
+#     Example: On a hunger games server, 20 players die within first 5 minutes, then the rate slows down. 5m would be a reasonable auto-save period.
+#   The value must be as small as possible to prevent losing/duplicating items on server crash.
+#     Risk of item loss or duplication is inevitable on server crashes, even in vanilla, but auto-saving once per hour may be unwise.
 auto-save: 0s

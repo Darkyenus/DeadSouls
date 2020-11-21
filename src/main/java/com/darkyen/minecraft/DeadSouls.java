@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -668,7 +669,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             // Normal player output
             final List<SoulDatabase.@NotNull SoulAndId> souls = soulDatabase.getSoulsByOwnerAndWorld(listAllSouls ? null : senderUUID, ((Player) sender).getWorld().getUID());
             final Location location = ((Player) sender).getLocation();
-            souls.sort(Comparator.comparingDouble(soulAndId -> Util.distance2(soulAndId.soul, location, 1)));
+            souls.sort(Comparator.comparingLong(soulAndId -> -soulAndId.soul.timestamp));
 
             final boolean canFree = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.free");
             final boolean canFreeAll = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.free.all");
@@ -676,19 +677,49 @@ public class DeadSouls extends JavaPlugin implements Listener {
             final boolean canGotoAll = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.goto.all");
 
             final int soulsPerPage = 6;
+            final long now = System.currentTimeMillis();
             for (int i = Math.max(soulsPerPage * number, 0), end = Math.min(i + soulsPerPage, souls.size()); i < end; i++) {
                 final SoulDatabase.SoulAndId soulAndId = souls.get(i);
                 final SoulDatabase.Soul soul = soulAndId.soul;
                 final float distance = (float) Math.sqrt(distance2(soul, location, 1));
 
-                final TextComponent baseText = new TextComponent(String.format("%.1f m", distance));
+                final TextComponent baseText = new TextComponent((i+1)+" ");
                 baseText.setColor(ChatColor.AQUA);
+                baseText.setBold(true);
+
+                long minutesOld = TimeUnit.MILLISECONDS.toMinutes(now - soul.timestamp);
+                if (minutesOld >= 0) {
+                    String age;
+                    if (minutesOld <= 1) {
+                        age = " Fresh";
+                    } else if (minutesOld < 60 * 2) {
+                        age = " " + minutesOld + " minutes old";
+                    } else if (minutesOld < 24 * 60) {
+                        age = " " + (minutesOld / 60) + " hours old";
+                    } else if (minutesOld < 24 * 60 * 100) {
+                        age = " " + (minutesOld / (24 * 60)) + " days old";
+                    } else {
+                        age = " Ancient";
+                    }
+
+                    final TextComponent ageText = new TextComponent(age);
+                    ageText.setColor(ChatColor.WHITE);
+                    ageText.setItalic(true);
+                    baseText.addExtra(ageText);
+                }
 
                 if (sender.hasPermission("com.darkyen.minecraft.deadsouls.coordinates")) {
                     final TextComponent coords = new TextComponent(String.format(" %d / %d / %d", Math.round(soul.locationX), Math.round(soul.locationY), Math.round(soul.locationZ)));
                     coords.setColor(ChatColor.GRAY);
                     baseText.addExtra(coords);
                 }
+
+                if (sender.hasPermission("com.darkyen.minecraft.deadsouls.distance")) {
+                    final TextComponent dist = new TextComponent(String.format(" %.1f m", distance));
+                    dist.setColor(ChatColor.AQUA);
+                    baseText.addExtra(dist);
+                }
+
 
                 final boolean ownSoul = soul.isOwnedBy(sender);
 
