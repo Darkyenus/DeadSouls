@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -38,7 +37,6 @@ import static com.darkyen.minecraft.Serialization.deserializeObject;
 import static com.darkyen.minecraft.Serialization.deserializeUUID;
 import static com.darkyen.minecraft.Serialization.serializeObject;
 import static com.darkyen.minecraft.Serialization.serializeUUID;
-import static com.darkyen.minecraft.Util.getWorld;
 import static com.darkyen.minecraft.Util.saturatedAdd;
 
 /**
@@ -79,32 +77,21 @@ public class SoulDatabase {
 
     /** NOTE: Synchronize on the collection before accessing */
     @NotNull
-    public List<@Nullable Soul> getSoulsById() {
+    ArrayList<@Nullable Soul> getSoulsById() {
 	    return soulsById;
     }
 
-    public static final class SoulAndId {
-        public final int id;
-        public final Soul soul;
-
-        public SoulAndId(int id, Soul soul) {
-            this.id = id;
-            this.soul = soul;
-        }
-    }
-
-    public List<@NotNull SoulAndId> getSoulsByOwnerAndWorld(@Nullable UUID owner, @Nullable UUID world) {
-        final ArrayList<SoulAndId> result = new ArrayList<>();
+    ArrayList<@NotNull Soul> getSoulsByOwnerAndWorld(@Nullable UUID owner, @Nullable UUID world) {
+        final ArrayList<Soul> result = new ArrayList<>();
         synchronized (soulsById) {
             final ArrayList<@Nullable Soul> soulsById = this.soulsById;
-            for (int i = 0; i < soulsById.size(); i++) {
-                Soul soul = soulsById.get(i);
+            for (Soul soul : soulsById) {
                 if (soul == null) {
                     continue;
                 }
                 if ((owner == null || owner.equals(soul.owner)) && (world == null || world
                         .equals(soul.locationWorld))) {
-                    result.add(new SoulAndId(i, soul));
+                    result.add(soul);
                 }
             }
         }
@@ -112,7 +99,7 @@ public class SoulDatabase {
     }
 
     @NotNull
-    public static List<Soul> load(@NotNull Path databaseFile) throws IOException, Serialization.Exception {
+    public static ArrayList<Soul> load(@NotNull Path databaseFile) throws IOException, Serialization.Exception {
         final ArrayList<Soul> result = new ArrayList<>();
         try (DataInputChannel in = new DataInputChannel(Files.newByteChannel(databaseFile, StandardOpenOption.READ))) {
             final int version = in.readInt();
@@ -230,7 +217,8 @@ public class SoulDatabase {
         return fadedSouls;
     }
 
-    public int addSoul(@Nullable UUID owner, @NotNull UUID world, double x, double y, double z, @NotNull ItemStack[] contents, int xp) {
+    @NotNull
+    public Soul addSoul(@Nullable UUID owner, @NotNull UUID world, double x, double y, double z, @NotNull ItemStack[] contents, int xp) {
         final Soul soul = new Soul(owner, world, x, y, z, System.currentTimeMillis(), contents, xp);
         int soulId = -1;
         synchronized (soulsById) {
@@ -246,10 +234,11 @@ public class SoulDatabase {
                 soulId = soulsById.size();
                 soulsById.add(soul);
             }
+            soul.id = soulId;
         }
         souls.insert(soul);
         dirty = true;
-        return soulId;
+        return soul;
     }
 
     public void markDirty() {
@@ -338,11 +327,10 @@ public class SoulDatabase {
 
     public void removeSoul(@NotNull Soul toRemove) {
         synchronized (soulsById) {
-            final int i = soulsById.indexOf(toRemove);
-            if (i == -1) {
+            if (toRemove.id < 0 || toRemove.id >= soulsById.size() || soulsById.get(toRemove.id) != toRemove) {
                 LOG.log(Level.WARNING, "Soul " + toRemove + " already removed from BY-ID");
             } else {
-                soulsById.set(i, null);
+                soulsById.set(toRemove.id, null);
                 dirty = true;
             }
         }
@@ -352,35 +340,38 @@ public class SoulDatabase {
         }
     }
 
-    public void findSouls(@NotNull World world, int x, int z, int radius, @NotNull Collection<Soul> out) {
+    public void findSouls(@NotNull UUID worldUID, int x, int z, int radius, @NotNull Collection<Soul> out) {
         souls.query((x - radius) / SOUL_STORE_SCALE, (x + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE,
                 (z - radius) / SOUL_STORE_SCALE, (z + radius + SOUL_STORE_SCALE - 1) / SOUL_STORE_SCALE, out);
-        final UUID worldUID = world.getUID();
         out.removeIf((soul) -> !worldUID.equals(soul.locationWorld));
     }
 
     /** A soul in a database. The fields that are not final can be modified,
      * but don't forget to {@link SoulDatabase#markDirty()} if you do to ensure that the changes are saved. */
-    public static final class Soul implements SpatialDatabase.Entry {
+    static final class Soul implements SpatialDatabase.Entry, DeadSoulsAPI.Soul {
+
+        /** Index at which this Soul is or was stored, if any.
+         * This is highly transient and does not serve as a way of identification. */
+        transient int id = -1;
 
         /** Current owner of the soul by {@link Player#getUniqueId()}. */
         @Nullable
-        public UUID owner;
+        UUID owner;
         /** World in which the soul is by {@link World#getUID()}. */
         @NotNull
-        public final UUID locationWorld;
+        final UUID locationWorld;
         /** Precise location of the soul in the world. */
-        public final double locationX, locationY, locationZ;
+        final double locationX, locationY, locationZ;
         /** When was the soul created on clock of {@link System#currentTimeMillis()}. */
-        public final long timestamp;
+        final long timestamp;
 
         /** Can be changed when collected */
         @NotNull
-        public ItemStack[] items;
+        ItemStack[] items;
         /** Can be changed when collected */
-        public int xp;
+        int xp;
 
-        public Soul(@Nullable UUID owner, @NotNull UUID locationWorld, double x, double y, double z, long timestamp, @NotNull ItemStack[] items, int xp) {
+        Soul(@Nullable UUID owner, @NotNull UUID locationWorld, double x, double y, double z, long timestamp, @NotNull ItemStack[] items, int xp) {
             this.owner = owner;
             this.locationWorld = locationWorld;
             this.locationX = x;
@@ -391,7 +382,7 @@ public class SoulDatabase {
             this.xp = xp;
         }
 
-        public boolean isOwnedBy(CommandSender commandSender) {
+        boolean isOwnedBy(CommandSender commandSender) {
             final UUID owner = this.owner;
             return owner != null
                     && commandSender instanceof OfflinePlayer
@@ -399,7 +390,7 @@ public class SoulDatabase {
         }
 
         @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-        public boolean isAccessibleBy(@NotNull OfflinePlayer player, long now, long soulFreeAfterMs) {
+        boolean isAccessibleBy(@NotNull OfflinePlayer player, long now, long soulFreeAfterMs) {
             final UUID owner = this.owner;
             if (owner != null && !owner.equals(player.getUniqueId())) {
                 // Soul of somebody else, not accessible unless expired
@@ -414,7 +405,7 @@ public class SoulDatabase {
         }
 
         /** @return true if free, false if already freed */
-        public boolean freeSoul(long now, long soulFreeAfterMs) {
+        boolean freeSoul(long now, long soulFreeAfterMs) {
             if (this.owner == null) {
                 return false;
             }
@@ -440,7 +431,7 @@ public class SoulDatabase {
         @Nullable
         public Location getLocation(@Nullable World worldHint) {
             Location locationCache = this.locationCache;
-            if (locationCache != null && getWorld(locationCache) != null) {
+            if (locationCache != null && Util.getWorld(locationCache) != null) {
                 return locationCache;
             }
             World world;
@@ -458,6 +449,55 @@ public class SoulDatabase {
             this.locationCache = locationCache;
             return locationCache;
         }
+
+        //region API Getters
+
+        @Override
+        public @Nullable UUID getOwner() {
+            return owner;
+        }
+
+        @Override
+        public @NotNull UUID getWorld() {
+            return locationWorld;
+        }
+
+        @Override
+        public double getLocationX() {
+            return locationX;
+        }
+
+        @Override
+        public double getLocationY() {
+            return locationY;
+        }
+
+        @Override
+        public double getLocationZ() {
+            return locationZ;
+        }
+
+        @Override
+        public @Nullable Location getLocation() {
+            return getLocation(null);
+        }
+
+        @Override
+        public long getCreationTimestamp() {
+            return timestamp;
+        }
+
+        @Override
+        public @NotNull ItemStack @NotNull [] getItems() {
+            return items;
+        }
+
+        @Override
+        public int getExperiencePoints() {
+            return xp;
+        }
+
+        //endregion
 
         @Override
         public boolean equals(Object o) {

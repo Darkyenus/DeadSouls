@@ -43,12 +43,14 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -67,7 +69,7 @@ import static com.darkyen.minecraft.Util.set;
 /**
  *
  */
-public class DeadSouls extends JavaPlugin implements Listener {
+public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
 
     @Nullable
     private SoulDatabase soulDatabase;
@@ -214,7 +216,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             final ArrayList<SoulDatabase.Soul> visibleSouls = info.visibleSouls;
             if (searchNewSouls) {
                 visibleSouls.clear();
-                soulDatabase.findSouls(world, playerLocation.getBlockX(), playerLocation.getBlockZ(), 100, visibleSouls);
+                soulDatabase.findSouls(world.getUID(), playerLocation.getBlockX(), playerLocation.getBlockZ(), 100, visibleSouls);
             }
 
             if (visibleSouls.isEmpty()) {
@@ -667,9 +669,9 @@ public class DeadSouls extends JavaPlugin implements Listener {
             sender.sendMessage(shownSouls+" souls");
         } else {
             // Normal player output
-            final List<SoulDatabase.@NotNull SoulAndId> souls = soulDatabase.getSoulsByOwnerAndWorld(listAllSouls ? null : senderUUID, ((Player) sender).getWorld().getUID());
+            final List<SoulDatabase.@NotNull Soul> souls = soulDatabase.getSoulsByOwnerAndWorld(listAllSouls ? null : senderUUID, ((Player) sender).getWorld().getUID());
             final Location location = ((Player) sender).getLocation();
-            souls.sort(Comparator.comparingLong(soulAndId -> -soulAndId.soul.timestamp));
+            souls.sort(Comparator.comparingLong(soulAndId -> -soulAndId.timestamp));
 
             final boolean canFree = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.free");
             final boolean canFreeAll = sender.hasPermission("com.darkyen.minecraft.deadsouls.souls.free.all");
@@ -679,8 +681,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
             final int soulsPerPage = 6;
             final long now = System.currentTimeMillis();
             for (int i = Math.max(soulsPerPage * number, 0), end = Math.min(i + soulsPerPage, souls.size()); i < end; i++) {
-                final SoulDatabase.SoulAndId soulAndId = souls.get(i);
-                final SoulDatabase.Soul soul = soulAndId.soul;
+                final SoulDatabase.Soul soul = souls.get(i);
                 final float distance = (float) Math.sqrt(distance2(soul, location, 1));
 
                 final TextComponent baseText = new TextComponent((i+1)+" ");
@@ -728,7 +729,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                     freeButton.setColor(ChatColor.GREEN);
                     freeButton.setBold(true);
                     freeButton.setUnderlined(true);
-                    freeButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls free "+soulAndId.id));
+                    freeButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls free "+soul.id));
                     baseText.addExtra("  ");
                     baseText.addExtra(freeButton);
                 }
@@ -738,7 +739,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
                     gotoButton.setColor(ChatColor.GOLD);
                     gotoButton.setBold(true);
                     gotoButton.setUnderlined(true);
-                    gotoButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls goto "+soulAndId.id));
+                    gotoButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls goto "+soul.id));
                     baseText.addExtra("  ");
                     baseText.addExtra(gotoButton);
                 }
@@ -870,7 +871,7 @@ public class DeadSouls extends JavaPlugin implements Listener {
         }
 
         final int soulId = soulDatabase.addSoul(owner, world.getUID(),
-                soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp);
+                soulLocation.getX(), soulLocation.getY(), soulLocation.getZ(), soulItems, soulXp).id;
         refreshNearbySoulCache = true;
 
         // Show coordinates if the player has poor taste
@@ -1051,4 +1052,162 @@ public class DeadSouls extends JavaPlugin implements Listener {
         /** created souls are immediately free and can be collected by anyone */
         FREE
     }
+
+    //region API Methods
+
+    @Override
+    public void getSouls(@NotNull Collection<@NotNull Soul> out) {
+        out.clear();
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return;
+        }
+        final List<SoulDatabase.@Nullable Soul> souls = soulDatabase.getSoulsById();
+        synchronized (souls) {
+            final int size = souls.size();
+            //noinspection ForLoopReplaceableByForEach
+            for (int i = 0; i < size; i++) {
+                final SoulDatabase.Soul soul = souls.get(i);
+                if (soul == null) continue;
+                out.add(soul);
+            }
+        }
+    }
+
+    @Override
+    public void getSoulsByPlayer(@NotNull Collection<@NotNull Soul> out, @Nullable UUID playerUUID) {
+        out.clear();
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return;
+        }
+        final List<SoulDatabase.@Nullable Soul> souls = soulDatabase.getSoulsById();
+        synchronized (souls) {
+            final int size = souls.size();
+            //noinspection ForLoopReplaceableByForEach
+            for (int i = 0; i < size; i++) {
+                final SoulDatabase.Soul soul = souls.get(i);
+                if (soul == null || !Objects.equals(playerUUID, soul.owner)) continue;
+                out.add(soul);
+            }
+        }
+    }
+
+    @Override
+    public void getSoulsByWorld(@NotNull Collection<@NotNull Soul> out, @NotNull UUID worldUUID) {
+        out.clear();
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return;
+        }
+        final List<SoulDatabase.@Nullable Soul> souls = soulDatabase.getSoulsById();
+        synchronized (souls) {
+            final int size = souls.size();
+            //noinspection ForLoopReplaceableByForEach
+            for (int i = 0; i < size; i++) {
+                final SoulDatabase.Soul soul = souls.get(i);
+                if (soul == null || !soul.locationWorld.equals(worldUUID)) continue;
+                out.add(soul);
+            }
+        }
+    }
+
+    @Override
+    public void getSoulsByPlayerAndWorld(@NotNull Collection<@NotNull Soul> out, @Nullable UUID playerUUID, @NotNull UUID worldUUID) {
+        out.clear();
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return;
+        }
+        final List<SoulDatabase.@Nullable Soul> souls = soulDatabase.getSoulsById();
+        synchronized (souls) {
+            final int size = souls.size();
+            //noinspection ForLoopReplaceableByForEach
+            for (int i = 0; i < size; i++) {
+                final SoulDatabase.Soul soul = souls.get(i);
+                if (soul == null || !soul.locationWorld.equals(worldUUID) || !Objects.equals(playerUUID, soul.owner)) continue;
+                out.add(soul);
+            }
+        }
+    }
+
+    @Override
+    public void getSoulsByLocation(@NotNull Collection<@NotNull Soul> out, @NotNull UUID worldUUID, int x, int z, int radius) {
+        out.clear();
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return;
+        }
+        //noinspection unchecked
+        soulDatabase.findSouls(worldUUID, x, z, radius, (Collection<SoulDatabase.Soul>) (Object) out);
+    }
+
+    @Override
+    public void freeSoul(@NotNull Soul soul) {
+        if (((SoulDatabase.Soul) soul).freeSoul(System.currentTimeMillis(), soulFreeAfterMs)) {
+            final SoulDatabase soulDatabase = this.soulDatabase;
+            if (soulDatabase == null) {
+                return;
+            }
+            soulDatabase.markDirty();
+        }
+    }
+
+    @Override
+    public void setSoulItems(@NotNull Soul soul, @NotNull ItemStack @NotNull [] items) {
+        ((SoulDatabase.Soul) soul).items = items;
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return;
+        }
+        soulDatabase.markDirty();
+    }
+
+    @Override
+    public void setSoulExperiencePoints(@NotNull Soul soul, int xp) {
+        ((SoulDatabase.Soul) soul).xp = xp;
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return;
+        }
+        soulDatabase.markDirty();
+    }
+
+    @Override
+    public void removeSoul(@NotNull Soul soul) {
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return;
+        }
+        soulDatabase.removeSoul((SoulDatabase.Soul) soul);
+    }
+
+    @Override
+    public boolean soulExists(@NotNull Soul soul) {
+        final SoulDatabase.Soul ssoul = (SoulDatabase.Soul) soul;
+        if (ssoul.id < 0) {
+            return false;
+        }
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            return false;
+        }
+
+        final ArrayList<SoulDatabase.@Nullable Soul> souls = soulDatabase.getSoulsById();
+        synchronized (souls) {
+            return ssoul.id < souls.size() && souls.get(ssoul.id) == soul;
+        }
+    }
+
+    @Override
+    public @NotNull Soul createSoul(@Nullable UUID owner, @NotNull UUID world, double x, double y, double z, @Nullable ItemStack[] contents, int xp) {
+        ItemStack[] nnContents = contents == null ? NO_ITEM_STACKS : contents;
+        final SoulDatabase soulDatabase = this.soulDatabase;
+        if (soulDatabase == null) {
+            //
+            return new SoulDatabase.Soul(owner, world, x, y, z, System.currentTimeMillis(), nnContents, xp);
+        }
+        return soulDatabase.addSoul(owner, world, x, y, z, nnContents, xp);
+    }
+    //endregion
 }
