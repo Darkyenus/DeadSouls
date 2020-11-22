@@ -21,6 +21,9 @@ import java.util.UUID;
  * Unless specified otherwise, the methods are not thread safe and MUST be called
  * from the main thread (the one from which standard Spigot callbacks are called).
  *
+ * Reference of this interface when the plugin is not present on the server will result
+ * in a {@link NoClassDefFoundError}, so be prepared to handle that.
+ *
  * @since 1.6
  */
 @SuppressWarnings("unused")
