@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 /**
  *
  */
+@SuppressWarnings("rawtypes")
 public class Serialization {
 
     private static final Logger LOG = Logger.getLogger("DeadSouls-Serialization");

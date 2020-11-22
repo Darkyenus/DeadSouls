@@ -35,6 +35,8 @@ public class DeadSoulsApiTest extends JavaPlugin {
 
 			server.getScheduler().runTaskTimer(this, () -> {
 
+				int removedSoulCount = 0;
+				int newSoulCount = 0;
 				for (Player onlinePlayer : server.getOnlinePlayers()) {
 					onlinePlayer.getLocation(location);
 
@@ -47,6 +49,7 @@ public class DeadSoulsApiTest extends JavaPlugin {
 							Collections.addAll(itemPool, soul.getItems());
 							xpPool[0] += soul.getExperiencePoints();
 							api.removeSoul(soul);
+							removedSoulCount++;
 						}
 						remove = !remove;
 					}
@@ -82,11 +85,14 @@ public class DeadSoulsApiTest extends JavaPlugin {
 							}
 
 							api.createSoul(null, worldUUID, locationSoul.getX(), locationSoul.getY(), locationSoul.getZ(), items, xp);
+							newSoulCount++;
 						}
 					}
 				}
 
-			}, 0, 20*5);
+				getLogger().info("Removed "+removedSoulCount+" souls, Added "+newSoulCount);
+
+			}, 0, 20*2);
 		} catch (NoClassDefFoundError e) {
 			getLogger().info("DeadSouls is not installed");
 		}
@@ -98,8 +104,8 @@ public class DeadSoulsApiTest extends JavaPlugin {
 		// http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/
 		double angle = random.nextDouble() * Math.PI * 2;
 		double distance = random.nextDouble() * radius * 0.75 + radius * 0.25;
-		final int x = (int) Math.round(Math.cos(angle) * distance);
-		final int z = (int) Math.round(Math.sin(angle) * distance);
+		final int x = player.getBlockX() + (int) Math.round(Math.cos(angle) * distance);
+		final int z = player.getBlockZ() + (int) Math.round(Math.sin(angle) * distance);
 
 		final World world = player.getWorld();
 		if (world == null) return false;

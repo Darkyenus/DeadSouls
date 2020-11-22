@@ -1,5 +1,6 @@
 @file:Suppress("unused")
 import wemi.*
+import wemi.assembly.MergeStrategy
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiRootFolder
 import wemi.dependency.Jitpack
@@ -35,6 +36,16 @@ val SpigotPlugin by archetype(Archetypes::JavaProject) {
 		}
 
 		assembled
+	}
+
+	assemblyMergeStrategy modify { strategy ->
+		{ name ->
+			if (name == "module-info.class") {
+				MergeStrategy.Discard
+			} else {
+				strategy(name)
+			}
+		}
 	}
 }
 

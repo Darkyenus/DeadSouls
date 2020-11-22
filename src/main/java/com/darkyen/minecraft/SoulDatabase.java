@@ -67,6 +67,7 @@ public class SoulDatabase {
 
 		try {
 			for (Soul soul : load(databaseFile)) {
+			    soul.id = soulsById.size();
 				soulsById.add(soul);
 				souls.insert(soul);
 			}
@@ -123,6 +124,7 @@ public class SoulDatabase {
         try (DataInputChannel in = new DataInputChannel(Files.newByteChannel(databaseFile, StandardOpenOption.READ))) {
             while (in.hasRemaining()) {
                 final Soul soul = deserializeSoul(in, 0);
+                soul.id = soulsById.size();
                 soulsById.add(soul);
                 souls.insert(soul);
                 soulCount++;
@@ -234,8 +236,8 @@ public class SoulDatabase {
                 soulId = soulsById.size();
                 soulsById.add(soul);
             }
-            soul.id = soulId;
         }
+        soul.id = soulId;
         souls.insert(soul);
         dirty = true;
         return soul;
@@ -326,8 +328,12 @@ public class SoulDatabase {
     }
 
     public void removeSoul(@NotNull Soul toRemove) {
+        if (toRemove.id < 0) {
+            // Soul was never added, ignore
+            return;
+        }
         synchronized (soulsById) {
-            if (toRemove.id < 0 || toRemove.id >= soulsById.size() || soulsById.get(toRemove.id) != toRemove) {
+            if (toRemove.id >= soulsById.size() || soulsById.get(toRemove.id) != toRemove) {
                 LOG.log(Level.WARNING, "Soul " + toRemove + " already removed from BY-ID");
             } else {
                 soulsById.set(toRemove.id, null);
@@ -533,6 +539,21 @@ public class SoulDatabase {
             result = 31 * result + Arrays.hashCode(items);
             result = 31 * result + xp;
             return result;
+        }
+
+        @Override
+        public String toString() {
+            return "Soul{" +
+                    "id=" + id +
+                    ", owner=" + owner +
+                    ", locationWorld=" + locationWorld +
+                    ", locationX=" + locationX +
+                    ", locationY=" + locationY +
+                    ", locationZ=" + locationZ +
+                    ", timestamp=" + timestamp +
+                    ", items=" + Arrays.toString(items) +
+                    ", xp=" + xp +
+                    '}';
         }
     }
 
