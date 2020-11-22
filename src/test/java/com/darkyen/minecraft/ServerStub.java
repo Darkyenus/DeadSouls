@@ -138,6 +138,21 @@ public class ServerStub implements Server {
 	public int getTicksPerMonsterSpawns() { return 0; }
 
 	@Override
+	public int getTicksPerWaterSpawns() {
+		return 0;
+	}
+
+	@Override
+	public int getTicksPerWaterAmbientSpawns() {
+		return 0;
+	}
+
+	@Override
+	public int getTicksPerAmbientSpawns() {
+		return 0;
+	}
+
+	@Override
 	public @Nullable Player getPlayer(@NotNull String name) { return null; }
 
 	@Override
@@ -229,6 +244,11 @@ public class ServerStub implements Server {
 	public @NotNull List<Recipe> getRecipesFor(@NotNull ItemStack result) { return Collections.emptyList(); }
 
 	@Override
+	public @Nullable Recipe getRecipe(@NotNull NamespacedKey namespacedKey) {
+		return null;
+	}
+
+	@Override
 	public @NotNull Iterator<Recipe> recipeIterator() { return Collections.emptyIterator(); }
 
 	@Override
@@ -236,6 +256,11 @@ public class ServerStub implements Server {
 
 	@Override
 	public void resetRecipes() { }
+
+	@Override
+	public boolean removeRecipe(@NotNull NamespacedKey namespacedKey) {
+		return false;
+	}
 
 	@Override
 	public @NotNull Map<String, String[]> getCommandAliases() { return Collections.emptyMap(); }
@@ -378,6 +403,11 @@ public class ServerStub implements Server {
 
 	@Override
 	public int getWaterAnimalSpawnLimit() {
+		return 0;
+	}
+
+	@Override
+	public int getWaterAmbientSpawnLimit() {
 		return 0;
 	}
 

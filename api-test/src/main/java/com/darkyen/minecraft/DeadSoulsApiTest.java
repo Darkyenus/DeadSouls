@@ -3,8 +3,11 @@ package com.darkyen.minecraft;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Server;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -93,6 +96,20 @@ public class DeadSoulsApiTest extends JavaPlugin {
 				getLogger().info("Removed "+removedSoulCount+" souls, Added "+newSoulCount);
 
 			}, 0, 20*2);
+
+			server.getPluginManager().registerEvents(new Listener() {
+
+				@EventHandler(ignoreCancelled = true)
+				public void onSoulPickup(DeadSoulsAPI.SoulPickupEvent event) {
+					if (random.nextBoolean()) {
+						event.setCancelled(true);
+						event.getPlayer().sendMessage("YOINKS! This delicious soul with "+event.getSoul().getExperiencePoints()+" XP and "+event.getSoul().getItems().length+" items is NOT FOR YOU!");
+						api.removeSoul(event.getSoul());
+						event.getPlayer().playSound(event.getSoul().getLocation(), "entity.piglin.jealous", 1f, 1f);
+					}
+				}
+
+			}, this);
 		} catch (NoClassDefFoundError e) {
 			getLogger().info("DeadSouls is not installed");
 		}

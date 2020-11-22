@@ -4,6 +4,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Cancellable;
+import org.bukkit.event.Event;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
@@ -121,5 +125,55 @@ public interface DeadSoulsAPI {
 
 		/** Get the experience points stored in the soul. */
 		int getExperiencePoints();
+	}
+
+	/**
+	 * Event that is triggered when a {@link Player} collects a {@link Soul}.
+	 *
+	 * NOTE: The event instance is reused, so do not store it or access it outside of the event handler.
+	 *
+	 * Pickups by players that are not normally eligible for soul pickups
+	 * (i.e. those in incompatible game modes) start off by being cancelled.
+	 */
+	final class SoulPickupEvent extends Event implements Cancellable {
+
+		private static final HandlerList HANDLERS = new HandlerList();
+
+		Player player;
+		Soul soul;
+		boolean cancelled;
+
+		SoulPickupEvent() {}
+
+		public @NotNull HandlerList getHandlers() {
+			return HANDLERS;
+		}
+
+		public static @NotNull HandlerList getHandlerList() {
+			return HANDLERS;
+		}
+
+		/** The player that is picking up the soul. */
+		@NotNull
+		public Player getPlayer() {
+			return player;
+		}
+
+		/** The soul that is being picked up. */
+		@NotNull
+		public Soul getSoul() {
+			return soul;
+		}
+
+		/** Whether or not this soul will be picked up. */
+		@Override
+		public boolean isCancelled() {
+			return cancelled;
+		}
+
+		@Override
+		public void setCancelled(boolean c) {
+			this.cancelled = c;
+		}
 	}
 }

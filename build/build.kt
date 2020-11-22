@@ -1,11 +1,13 @@
 @file:Suppress("unused")
 import wemi.*
+import wemi.Keys
 import wemi.assembly.MergeStrategy
 import wemi.boot.WemiBuildFolder
 import wemi.boot.WemiRootFolder
 import wemi.dependency.Jitpack
 import wemi.dependency.ProjectDependency
 import wemi.dependency.sonatypeOss
+import wemi.test.JUnitPlatformLauncher
 import wemi.util.*
 import java.nio.file.StandardCopyOption
 
@@ -53,12 +55,19 @@ val SpigotPlugin by archetype(Archetypes::JavaProject) {
 	}
 }
 
-val DeadSouls by project(SpigotPlugin) {
+val DeadSouls by project(SpigotPlugin, Archetypes.JUnitLayer) {
 	projectName set { "DeadSouls" }
 
+	// We have to apply testing dependencies only in the testing
+	extend(Archetypes.JUnitLayer) {
+		libraryDependencies modify { it.filterNot { it.scope == ScopeTest }.toSet() }
+	}
 	extend(testing) {
-		libraryDependencies add { Dependency(JUnitAPI) }
-		libraryDependencies add { Dependency(JUnitEngine) }
+		Keys.libraryDependencies addAll { listOf(
+				wemi.dependency.Dependency(wemi.test.JUnitAPI, scope = wemi.dependency.ScopeTest),
+				wemi.dependency.Dependency(wemi.test.JUnitEngine, scope = wemi.dependency.ScopeTest),
+				wemi.dependency.Dependency(JUnitPlatformLauncher, scope = wemi.dependency.ScopeTest)
+		) }
 	}
 }
 

@@ -6,6 +6,7 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.GameMode;
 import org.bukkit.GameRule;
@@ -34,6 +35,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.NumberConversions;
 import org.jetbrains.annotations.NotNull;
@@ -155,6 +157,8 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
     private final Location processPlayers_playerLocation = new Location(null, 0, 0, 0);
     @NotNull
     private final Random processPlayers_random = new Random();
+    @NotNull
+    private final DeadSoulsAPI.SoulPickupEvent soulPickupEvent = new SoulPickupEvent();
 
     private long processPlayers_nextFadeCheck = 0;
     private long processPlayers_nextAutoSave = 0;
@@ -166,6 +170,7 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
             return;
         }
 
+        final PluginManager pluginManager = getServer().getPluginManager();
         final long now = System.currentTimeMillis();
 
         if (now > processPlayers_nextFadeCheck && soulFadesAfterMs < Long.MAX_VALUE) {
@@ -262,7 +267,9 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
             }
 
             // Process collisions
-            if (!player.isDead() && (playerGameMode == GameMode.SURVIVAL || playerGameMode == GameMode.ADVENTURE)) {
+            if (!player.isDead()) {
+                final boolean playerCanCollectByDefault = (playerGameMode == GameMode.SURVIVAL || playerGameMode == GameMode.ADVENTURE);
+
                 //noinspection ForLoopReplaceableByForEach
                 for (int soulI = 0; soulI < visibleSouls.size(); soulI++) {
                     final SoulDatabase.Soul closestSoul = visibleSouls.get(soulI);
@@ -275,55 +282,62 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
                     final Location closestSoulLocation = closestSoul.getLocation(player.getWorld());
 
                     if (dst2 < COLLECTION_DISTANCE2) {
-                        // Collect it!
-                        if (closestSoul.xp > 0) {
-                            player.giveExp(closestSoul.xp);
-                            closestSoul.xp = 0;
-                            if (!soundSoulCollectXp.isEmpty() && closestSoulLocation != null) {
-                                player.playSound(closestSoulLocation, soundSoulCollectXp, 1f, 1f);
-                            }
-                            databaseChanged = true;
-                        }
+                        soulPickupEvent.cancelled = !playerCanCollectByDefault;
+                        soulPickupEvent.player = player;
+                        soulPickupEvent.soul = closestSoul;
+                        pluginManager.callEvent(soulPickupEvent);
 
-                        final @NotNull ItemStack[] items = closestSoul.items;
-                        if (items.length > 0) {
-                            final HashMap<Integer, ItemStack> overflow = player.getInventory().addItem(items);
-                            if (overflow.isEmpty()) {
-                                closestSoul.items = NO_ITEM_STACKS;
-                            } else {
-                                closestSoul.items = overflow.values().toArray(NO_ITEM_STACKS);
-                            }
-
-                            boolean someCollected = false;
-                            if (overflow.size() < items.length) {
-                                someCollected = true;
+                        if (!soulPickupEvent.cancelled) {
+                            // Collect it!
+                            if (closestSoul.xp > 0) {
+                                player.giveExp(closestSoul.xp);
+                                closestSoul.xp = 0;
+                                if (!soundSoulCollectXp.isEmpty() && closestSoulLocation != null) {
+                                    player.playSound(closestSoulLocation, soundSoulCollectXp, 1f, 1f);
+                                }
                                 databaseChanged = true;
-                            } else {
-                                for (Map.Entry<Integer, ItemStack> overflowEntry : overflow.entrySet()) {
-                                    if (!items[overflowEntry.getKey()].equals(overflowEntry.getValue())) {
-                                        someCollected = true;
-                                        databaseChanged = true;
-                                        break;
+                            }
+
+                            final @NotNull ItemStack[] items = closestSoul.items;
+                            if (items.length > 0) {
+                                final HashMap<Integer, ItemStack> overflow = player.getInventory().addItem(items);
+                                if (overflow.isEmpty()) {
+                                    closestSoul.items = NO_ITEM_STACKS;
+                                } else {
+                                    closestSoul.items = overflow.values().toArray(NO_ITEM_STACKS);
+                                }
+
+                                boolean someCollected = false;
+                                if (overflow.size() < items.length) {
+                                    someCollected = true;
+                                    databaseChanged = true;
+                                } else {
+                                    for (Map.Entry<Integer, ItemStack> overflowEntry : overflow.entrySet()) {
+                                        if (!items[overflowEntry.getKey()].equals(overflowEntry.getValue())) {
+                                            someCollected = true;
+                                            databaseChanged = true;
+                                            break;
+                                        }
                                     }
                                 }
-                            }
 
-                            if (someCollected && !soundSoulCollectItem.isEmpty() && closestSoulLocation != null) {
-                                player.playSound(closestSoulLocation, soundSoulCollectItem, 1f, 0.5f);
-                            }
-                        }
-
-                        if (closestSoul.xp <= 0 && closestSoul.items.length <= 0) {
-                            // Soul is depleted
-                            soulDatabase.removeSoul(closestSoul);
-                            this.refreshNearbySoulCache = true;
-
-                            // Do some fancy effect
-                            if (closestSoulLocation != null) {
-                                if (!soundSoulDepleted.isEmpty()) {
-                                    player.playSound(closestSoulLocation, soundSoulDepleted, 0.1f, 0.5f);
+                                if (someCollected && !soundSoulCollectItem.isEmpty() && closestSoulLocation != null) {
+                                    player.playSound(closestSoulLocation, soundSoulCollectItem, 1f, 0.5f);
                                 }
-                                player.spawnParticle(Particle.REDSTONE, closestSoulLocation, 20, 0.2, 0.2, 0.2, soulDustOptionsGone);
+                            }
+
+                            if (closestSoul.xp <= 0 && closestSoul.items.length <= 0) {
+                                // Soul is depleted
+                                soulDatabase.removeSoul(closestSoul);
+                                this.refreshNearbySoulCache = true;
+
+                                // Do some fancy effect
+                                if (closestSoulLocation != null) {
+                                    if (!soundSoulDepleted.isEmpty()) {
+                                        player.playSound(closestSoulLocation, soundSoulDepleted, 0.1f, 0.5f);
+                                    }
+                                    player.spawnParticle(Particle.REDSTONE, closestSoulLocation, 20, 0.2, 0.2, 0.2, soulDustOptionsGone);
+                                }
                             }
                         }
                     } else if (playCallingSounds && closestSoulLocation != null) {
