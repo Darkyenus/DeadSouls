@@ -3,7 +3,6 @@ package com.darkyen.minecraft;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Server;
-import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -102,10 +101,17 @@ public class DeadSoulsApiTest extends JavaPlugin {
 				@EventHandler(ignoreCancelled = true)
 				public void onSoulPickup(DeadSoulsAPI.SoulPickupEvent event) {
 					if (random.nextBoolean()) {
+						final DeadSoulsAPI.Soul soul = event.getSoul();
+						final Player player = event.getPlayer();
+
 						event.setCancelled(true);
-						event.getPlayer().sendMessage("YOINKS! This delicious soul with "+event.getSoul().getExperiencePoints()+" XP and "+event.getSoul().getItems().length+" items is NOT FOR YOU!");
-						api.removeSoul(event.getSoul());
-						event.getPlayer().playSound(event.getSoul().getLocation(), "entity.piglin.jealous", 1f, 1f);
+						player.sendMessage("YOINKS! This delicious soul with "+ soul.getExperiencePoints()+" XP and "+ soul.getItems().length+" items is NOT FOR YOU!");
+						api.removeSoul(soul);
+
+						final Location location = soul.getLocation();
+						if (location != null) {
+							player.playSound(location, "entity.piglin.jealous", 1f, 1f);
+						}
 					}
 				}
 
@@ -157,7 +163,7 @@ public class DeadSoulsApiTest extends JavaPlugin {
 	private static Material randomItemMaterial() {
 		while (true) {
 			final Material mat = MATERIALS[random.nextInt(MATERIALS.length)];
-			if (!mat.isLegacy() && mat.isItem()) {
+			if (!mat.name().startsWith("LEGACY_") && mat.isItem()) {
 				return mat;
 			}
 		}
