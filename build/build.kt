@@ -13,7 +13,11 @@ val liveTesting by configuration("Add live testing capability") {
 	sources modify { it + FileSet(WemiRootFolder / "src/live-test/java") }
 
 	libraryDependencies add { Dependency(JUnitAPI) }
+
+	spigotVersion set { "1.16.1-R0.1-SNAPSHOT" }
 }
+
+val spigotVersion by key("Spigot API version to use", "1.14.4-R0.1-SNAPSHOT")
 
 val SpigotPlugin by archetype(Archetypes::JavaProject) {
 	projectGroup set { "com.darkyen.minecraft" }
@@ -24,7 +28,7 @@ val SpigotPlugin by archetype(Archetypes::JavaProject) {
 	repositories add { sonatypeOss("snapshots") }
 
 	libraryDependencies add { wemi.dependency("org.jetbrains", "annotations", "16.0.2", scope = ScopeProvided) }
-	libraryDependencies add { wemi.dependency("org.spigotmc", "spigot-api", "1.14.4-R0.1-SNAPSHOT", scope = ScopeProvided) }
+	libraryDependencies add { wemi.dependency("org.spigotmc", "spigot-api", spigotVersion.get(), scope = ScopeProvided) }
 
 	assemblyOutputFile set { WemiBuildFolder / "${projectName.get()}-${projectVersion.get()}.jar" }
 

@@ -4,20 +4,27 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.configuration.serialization.ConfigurationSerializable;
+import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Assertions;
+import org.opentest4j.AssertionFailedError;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -77,6 +84,7 @@ class ItemStoreTest {
                 itemStacks[item].setItemMeta(itemMeta);
             }
             soulDatabase.addSoul(UUID.randomUUID(), UUID.randomUUID(), random.nextDouble(), random.nextDouble(), random.nextDouble(), itemStacks, random.nextInt(100000));
+            Assertions.assertTrue(soulDatabase.save());
 
             final List<SoulDatabase.Soul> loaded = SoulDatabase.load(temporaryDatabaseFile);
             final List<SoulDatabase.@Nullable Soul> expected = soulDatabase.getSoulsById();
@@ -98,6 +106,16 @@ class ItemStoreTest {
     }
 
     public static void runLiveTest(Plugin plugin) throws Exception {
+        // Known bad
+        {
+            final ItemStack item = new ItemStack(Material.COMPASS);
+            final ItemMeta meta = item.getItemMeta();
+            meta.setDisplayName("foo");
+            item.setItemMeta(meta);
+            testSerialization(sanitize(item));
+        }
+
+        // Everything
         for (Material value : Material.values()) {
             if (!value.isItem() || value.getMaxStackSize() <= 0) {
                 continue;
@@ -149,7 +167,11 @@ class ItemStoreTest {
             }
 
             try {
-                testSerialization(item);
+                try {
+                    testSerialization(item);
+                } catch (AssertionFailedError e) {
+                    testSerialization(sanitize(item));
+                }
             } catch (Throwable t) {
                 System.out.println("Failed: "+item.getType());
                 t.printStackTrace();
@@ -169,5 +191,49 @@ class ItemStoreTest {
                 LOG.log(Level.WARNING, "Development test failed (async)", e);
             }
         });
+    }
+
+    /**
+     * Spigot adds some fields on serialization round-trip, which break tests.
+     * Therefore we must do one extra round trip, to ensure that there is no problem.
+     */
+    @SuppressWarnings("unchecked")
+    @NotNull
+    private static ItemStack sanitize(@NotNull ItemStack item) {
+        final Map<String, Object> serialized = item.serialize();
+        try {
+            final Map<String, Object> sanitized = (Map<String, Object>) sanitize(serialized);
+            return ItemStack.deserialize(sanitized);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to sanitize "+item, e);
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Object sanitize(Object object) throws ClassNotFoundException {
+        if (object instanceof Map) {
+            final HashMap<String, Object> newMap = new HashMap<>();
+            for (Map.Entry<String, Object> entry : ((Map<String, Object>) object).entrySet()) {
+                newMap.put(entry.getKey(), sanitize(entry.getValue()));
+            }
+            return newMap;
+        } else if (object instanceof List) {
+            final ArrayList<Object> newList = new ArrayList<>();
+            for (Object o : (List<Object>) object) {
+                newList.add(sanitize(o));
+            }
+            return newList;
+        } else if (object instanceof ConfigurationSerializable) {
+            final String alias = ConfigurationSerialization.getAlias((Class) object.getClass());
+            final Map<String, Object> sanitized = (Map<String, Object>) sanitize(((ConfigurationSerializable) object).serialize());
+
+            Class<? extends ConfigurationSerializable> serializedClass = ConfigurationSerialization.getClassByAlias(alias);
+            if (serializedClass == null) {
+                //noinspection unchecked
+                serializedClass = (Class<? extends ConfigurationSerializable>) Class.forName(alias);
+            }
+
+            return ConfigurationSerialization.deserializeObject(sanitized, serializedClass);
+        } else return object;
     }
 }
