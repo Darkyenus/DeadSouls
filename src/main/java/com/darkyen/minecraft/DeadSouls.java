@@ -6,7 +6,6 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.GameMode;
 import org.bukkit.GameRule;
@@ -47,13 +46,13 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -138,7 +137,7 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
     @NotNull
     private Particle.DustOptions soulDustOptionsGone = new Particle.DustOptions(DEFAULT_SOUL_DUST_COLOR_GONE, DEFAULT_SOUL_DUST_SIZE_GONE);
 
-    private final EnumSet<EntityType> animalsWithSouls = EnumSet.noneOf(EntityType.class);
+    private final Set<EntityType> animalsWithSouls = new HashSet<>();
 
     private final ArrayList<Pattern> worldPatterns = new ArrayList<>();
     private final HashSet<UUID> enabledWorlds = new HashSet<>();

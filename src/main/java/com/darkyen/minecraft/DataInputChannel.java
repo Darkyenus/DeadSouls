@@ -70,12 +70,12 @@ public class DataInputChannel implements DataInput, Channel {
     }
 
     @Override
-    public void readFully(@NotNull byte[] b) throws IOException {
+    public void readFully(byte @NotNull [] b) throws IOException {
         readFully(b, 0, b.length);
     }
 
     @Override
-    public void readFully(@NotNull byte[] b, int off, int len) throws IOException {
+    public void readFully(byte @NotNull [] b, int off, int len) throws IOException {
         if (len <= 0) {
             return;
         }
@@ -189,10 +189,8 @@ public class DataInputChannel implements DataInput, Channel {
         throw new UnsupportedOperationException("readLine is deprecated and not supported");
     }
 
-    @Nullable
-    private byte[] byteArr;
-    @Nullable
-    private char[] charArr;
+    private byte @Nullable [] byteArr;
+    private char @Nullable [] charArr;
 
     @NotNull
     @Override
@@ -243,7 +241,7 @@ public class DataInputChannel implements DataInput, Channel {
                     if (count > utfLen)
                         throw new UTFDataFormatException(
                                 "malformed input: partial character at end");
-                    char2 = (int) byteArr[count - 1];
+                    char2 = byteArr[count - 1];
                     if ((char2 & 0xC0) != 0x80)
                         throw new UTFDataFormatException(
                                 "malformed input around byte " + count);
@@ -256,8 +254,8 @@ public class DataInputChannel implements DataInput, Channel {
                     if (count > utfLen)
                         throw new UTFDataFormatException(
                                 "malformed input: partial character at end");
-                    char2 = (int) byteArr[count - 2];
-                    char3 = (int) byteArr[count - 1];
+                    char2 = byteArr[count - 2];
+                    char3 = byteArr[count - 1];
                     if (((char2 & 0xC0) != 0x80) || ((char3 & 0xC0) != 0x80))
                         throw new UTFDataFormatException(
                                 "malformed input around byte " + (count - 1));

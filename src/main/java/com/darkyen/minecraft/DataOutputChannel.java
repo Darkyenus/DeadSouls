@@ -68,12 +68,12 @@ public class DataOutputChannel implements DataOutput, Channel {
     }
 
     @Override
-    public void write(@NotNull byte[] b) throws IOException {
+    public void write(byte @NotNull [] b) throws IOException {
         write(b, 0, b.length);
     }
 
     @Override
-    public void write(@NotNull byte[] b, int off, int len) throws IOException {
+    public void write(byte @NotNull [] b, int off, int len) throws IOException {
         require(1);
         if (len <= 0) {
             return;
