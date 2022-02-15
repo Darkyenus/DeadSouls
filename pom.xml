@@ -19,7 +19,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spigot.version>1.16.1-R0.1-SNAPSHOT</spigot.version>
+        <spigot.version>1.18.1-R0.1-SNAPSHOT</spigot.version>
     </properties>
 
     <repositories>

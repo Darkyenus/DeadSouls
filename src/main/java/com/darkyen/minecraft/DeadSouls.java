@@ -2,9 +2,7 @@ package com.darkyen.minecraft;
 
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Color;
 import org.bukkit.GameMode;
@@ -70,7 +68,7 @@ import static com.darkyen.minecraft.Util.set;
 /**
  *
  */
-public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
+public final class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
 
     @Nullable
     private SoulDatabase soulDatabase;
@@ -908,8 +906,7 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
             freeMySoul.setBold(true);
             freeMySoul.setUnderlined(true);
             if (textFreeMySoulTooltip != null && !textFreeMySoulTooltip.isEmpty()) {
-                freeMySoul.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                        new BaseComponent[]{new TextComponent(textFreeMySoulTooltip)}));
+                SpigotCompat.textComponentSetHoverText(freeMySoul, textFreeMySoulTooltip);
             }
             freeMySoul.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/souls free " + soulId));
             player.spigot().sendMessage(ChatMessageType.CHAT, star, freeMySoul, star);
@@ -1006,7 +1003,7 @@ public class DeadSouls extends JavaPlugin implements Listener, DeadSoulsAPI {
             final World world = player.getWorld();
 
             final int x = playerLocation.getBlockX();
-            int y = Util.clamp(playerLocation.getBlockY(), 0, world.getMaxHeight());
+            int y = Util.clamp(playerLocation.getBlockY(), SpigotCompat.worldGetMinHeight(world), world.getMaxHeight());
             final int z = playerLocation.getBlockZ();
 
             if (improve) {

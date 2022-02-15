@@ -13,7 +13,7 @@ import java.nio.channels.SeekableByteChannel;
 /**
  *
  */
-public class DataOutputChannel implements DataOutput, Channel {
+final class DataOutputChannel implements DataOutput, Channel {
 
     @NotNull
     private final SeekableByteChannel chn;

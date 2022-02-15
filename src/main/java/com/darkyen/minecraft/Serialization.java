@@ -21,7 +21,7 @@ import java.util.logging.Logger;
  *
  */
 @SuppressWarnings("rawtypes")
-public class Serialization {
+final class Serialization {
 
     private static final Logger LOG = Logger.getLogger("DeadSouls-Serialization");
 
@@ -237,14 +237,9 @@ public class Serialization {
         static final SerializedType[] VALUES = values();
     }
 
-    public static final class Exception extends java.lang.Exception {
+    static final class Exception extends java.lang.Exception {
         Exception(@NotNull String message) {
             super(message);
         }
-
-        Exception(@NotNull String message, @NotNull Throwable cause) {
-            super(message, cause);
-        }
     }
-
 }

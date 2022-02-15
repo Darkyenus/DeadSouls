@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  *
  */
 @SuppressWarnings("WeakerAccess")
-public class Util {
+final class Util {
 
     public static boolean overlaps(int quadMin, int quadMax, int queryMin, int queryMax) {
         return queryMin <= quadMax && queryMax >= quadMin;

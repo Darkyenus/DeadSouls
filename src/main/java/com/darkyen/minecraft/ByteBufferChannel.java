@@ -8,7 +8,7 @@ import java.nio.channels.SeekableByteChannel;
 /**
  *
  */
-public class ByteBufferChannel implements SeekableByteChannel {
+final class ByteBufferChannel implements SeekableByteChannel {
 
     @NotNull
     private final ByteBuffer buffer;

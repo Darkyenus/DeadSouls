@@ -8,6 +8,7 @@ import java.io.DataInput;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UTFDataFormatException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.Channel;
@@ -16,7 +17,7 @@ import java.nio.channels.SeekableByteChannel;
 /**
  *
  */
-public class DataInputChannel implements DataInput, Channel {
+final class DataInputChannel implements DataInput, Channel {
 
     @NotNull
     private final SeekableByteChannel chn;
@@ -26,7 +27,7 @@ public class DataInputChannel implements DataInput, Channel {
     public DataInputChannel(@NotNull SeekableByteChannel chn, int bufferSize) {
         this.chn = chn;
         buffer = ByteBuffer.allocate(bufferSize).order(ByteOrder.BIG_ENDIAN);
-        this.buffer.limit(0);
+        buffer.limit(0);
     }
 
     public DataInputChannel(@NotNull SeekableByteChannel chn) {

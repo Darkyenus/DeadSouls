@@ -43,7 +43,7 @@ import static com.darkyen.minecraft.Util.saturatedAdd;
  *
  */
 @SuppressWarnings("WeakerAccess") // For tests
-public class SoulDatabase {
+final class SoulDatabase {
 
     private static final Logger LOG = Logger.getLogger("DeadSouls-ItemStore");
 

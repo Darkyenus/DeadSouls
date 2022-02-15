@@ -13,7 +13,7 @@ import static com.darkyen.minecraft.Util.overlaps;
  * Implements a modified Quad-tree algorithm, which splits the world into Tiles,
  * which contain a few quad-tree subdivisions.
  */
-public final class SpatialDatabase<E extends SpatialDatabase.Entry> {
+final class SpatialDatabase<E extends SpatialDatabase.Entry> {
 
     private static final int CHUNK_BUCKET_LEVEL = 7;
     private static final int MAX_QUAD_SIZE = 16;
